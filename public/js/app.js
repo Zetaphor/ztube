@@ -15,6 +15,19 @@ const uploadDate = document.getElementById('uploadDate');
 const commentsList = document.getElementById('commentsList');
 const loadMoreComments = document.getElementById('loadMoreComments');
 
+// Custom controls elements
+const playPauseBtn = document.getElementById('playPauseBtn');
+const progressBar = document.getElementById('progressBar');
+const progress = document.getElementById('progress');
+const currentTime = document.getElementById('currentTime');
+const duration = document.getElementById('duration');
+const volumeBtn = document.getElementById('volumeBtn');
+const volumeSlider = document.getElementById('volumeSlider');
+const volumeLevel = document.getElementById('volumeLevel');
+const playbackSpeedBtn = document.getElementById('playbackSpeedBtn');
+const speedOptions = document.getElementById('speedOptions');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+
 let currentVideoId = null;
 let commentsNextPage = null;
 let vjsPlayer = null;
@@ -39,22 +52,117 @@ function initializePlayer() {
 
   vjsPlayer = videojs('player', {
     preload: 'auto',
-    controls: true,
+    controls: false, // Disable default controls
     fluid: true,
-    playbackRates: [0.5, 1, 1.25, 1.5, 2],
-    controlBar: {
-      children: [
-        'playToggle',
-        'progressControl',
-        'currentTimeDisplay',
-        'timeDivider',
-        'durationDisplay',
-        'volumePanel',
-        'playbackRateMenuButton',
-        'fullscreenToggle'
-      ]
-    }
+    playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
   });
+
+  // Set up custom controls
+  setupCustomControls();
+}
+
+function setupCustomControls() {
+  if (!vjsPlayer) return;
+
+  // Play/Pause
+  playPauseBtn.addEventListener('click', togglePlayPause);
+  vjsPlayer.on('play', () => {
+    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+  });
+  vjsPlayer.on('pause', () => {
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+  });
+
+  // Progress bar
+  vjsPlayer.on('timeupdate', updateProgress);
+  progressBar.addEventListener('click', seek);
+
+  // Volume control
+  volumeBtn.addEventListener('click', toggleMute);
+  volumeSlider.addEventListener('click', updateVolume);
+  vjsPlayer.on('volumechange', () => {
+    updateVolumeUI();
+  });
+
+  // Playback speed
+  const speedItems = speedOptions.querySelectorAll('[data-speed]');
+  speedItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const speed = parseFloat(item.dataset.speed);
+      vjsPlayer.playbackRate(speed);
+      playbackSpeedBtn.innerHTML = `${speed}x`;
+      speedOptions.classList.add('hidden');
+    });
+  });
+
+  // Fullscreen
+  fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+  // Update duration once metadata is loaded
+  vjsPlayer.on('loadedmetadata', () => {
+    duration.textContent = formatTime(vjsPlayer.duration());
+  });
+}
+
+function togglePlayPause() {
+  if (vjsPlayer.paused()) {
+    vjsPlayer.play();
+  } else {
+    vjsPlayer.pause();
+  }
+}
+
+function updateProgress() {
+  const percent = (vjsPlayer.currentTime() / vjsPlayer.duration()) * 100;
+  progress.style.width = `${percent}%`;
+  currentTime.textContent = formatTime(vjsPlayer.currentTime());
+}
+
+function seek(event) {
+  const rect = progressBar.getBoundingClientRect();
+  const pos = (event.clientX - rect.left) / rect.width;
+  vjsPlayer.currentTime(pos * vjsPlayer.duration());
+}
+
+function toggleMute() {
+  vjsPlayer.muted(!vjsPlayer.muted());
+}
+
+function updateVolume(event) {
+  const rect = volumeSlider.getBoundingClientRect();
+  const volume = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  vjsPlayer.volume(volume);
+  updateVolumeUI();
+}
+
+function updateVolumeUI() {
+  const volume = vjsPlayer.volume();
+  volumeLevel.style.width = `${volume * 100}%`;
+
+  // Update volume icon
+  if (vjsPlayer.muted() || volume === 0) {
+    volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+  } else if (volume < 0.5) {
+    volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
+  } else {
+    volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+  }
+}
+
+function toggleFullscreen() {
+  if (vjsPlayer.isFullscreen()) {
+    vjsPlayer.exitFullscreen();
+    fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+  } else {
+    vjsPlayer.requestFullscreen();
+    fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+  }
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 // Search Functions

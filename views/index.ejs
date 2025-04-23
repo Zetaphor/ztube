@@ -39,10 +39,51 @@
           <i class="fas fa-times"></i>
         </button>
         <div class="bg-black rounded-t-lg overflow-hidden">
-          <video id="player" class="video-js vjs-default-skin vjs-big-play-centered w-full aspect-video" controls
-            preload="auto">
+          <video id="player" class="video-js vjs-default-skin vjs-big-play-centered w-full aspect-video" preload="auto">
             Your browser does not support the video tag.
           </video>
+          <!-- Custom control bar -->
+          <div id="customControls" class="bg-black bg-opacity-70 p-2 flex items-center space-x-4">
+            <button id="playPauseBtn" class="text-white hover:text-red-500">
+              <i class="fas fa-play"></i>
+            </button>
+            <div class="flex-1 relative">
+              <div id="progressBar" class="h-1 bg-gray-600 rounded cursor-pointer">
+                <div id="progress" class="h-full bg-red-600 rounded" style="width: 0%"></div>
+              </div>
+              <span id="currentTime" class="text-white text-sm absolute -bottom-5 left-0">0:00</span>
+              <span id="duration" class="text-white text-sm absolute -bottom-5 right-0">0:00</span>
+            </div>
+            <div class="flex items-center space-x-4">
+              <div class="group relative">
+                <button id="volumeBtn" class="text-white hover:text-red-500">
+                  <i class="fas fa-volume-up"></i>
+                </button>
+                <div id="volumeSlider"
+                  class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-24 h-1 bg-gray-600 rounded cursor-pointer">
+                  <div id="volumeLevel" class="h-full bg-red-600 rounded" style="width: 100%"></div>
+                </div>
+              </div>
+              <div class="group relative">
+                <button id="playbackSpeedBtn" class="text-white hover:text-red-500">
+                  <i class="fas fa-tachometer-alt"></i>
+                </button>
+                <div id="speedOptions"
+                  class="hidden group-hover:block absolute bottom-full right-0 mb-2 bg-black bg-opacity-90 rounded py-1">
+                  <div class="text-white text-sm px-4 py-1 hover:bg-red-600 cursor-pointer" data-speed="0.25">0.25x
+                  </div>
+                  <div class="text-white text-sm px-4 py-1 hover:bg-red-600 cursor-pointer" data-speed="0.5">0.5x</div>
+                  <div class="text-white text-sm px-4 py-1 hover:bg-red-600 cursor-pointer" data-speed="1"
+                    id="normalSpeed">1x</div>
+                  <div class="text-white text-sm px-4 py-1 hover:bg-red-600 cursor-pointer" data-speed="1.5">1.5x</div>
+                  <div class="text-white text-sm px-4 py-1 hover:bg-red-600 cursor-pointer" data-speed="2">2x</div>
+                </div>
+              </div>
+              <button id="fullscreenBtn" class="text-white hover:text-red-500">
+                <i class="fas fa-expand"></i>
+              </button>
+            </div>
+          </div>
         </div>
         <div id="videoInfo" class="bg-white p-6 rounded-b-lg">
           <div class="flex justify-between items-center mb-4">
