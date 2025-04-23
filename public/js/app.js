@@ -30,7 +30,7 @@ const fullscreenBtn = document.getElementById('fullscreenBtn');
 
 let currentVideoId = null;
 let commentsNextPage = null;
-let vjsPlayer = null;
+let ytPlayer = null;
 
 // Event Listeners
 searchButton.addEventListener('click', performSearch);
@@ -44,60 +44,96 @@ qualitySelect.addEventListener('change', () => {
   }
 });
 
-// Initialize video.js player
-function initializePlayer() {
-  if (vjsPlayer) {
-    vjsPlayer.dispose();
+// Initialize YouTube player
+function onYouTubeIframeAPIReady() {
+  // Player will be initialized when a video is selected
+}
+
+function initializePlayer(videoId) {
+  if (ytPlayer) {
+    ytPlayer.destroy();
   }
 
-  vjsPlayer = videojs('player', {
-    preload: 'auto',
-    controls: false, // Disable default controls
-    fluid: true,
-    playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+  ytPlayer = new YT.Player('player', {
+    height: '390',
+    width: '640',
+    videoId: videoId,
+    playerVars: {
+      'playsinline': 1,
+      'controls': 0,
+      'disablekb': 1,
+      'rel': 0,
+      'modestbranding': 1,
+      'showinfo': 0,
+      'iv_load_policy': 3,
+      'fs': 0 // Disable fullscreen button since we have our own
+    },
+    events: {
+      'onReady': onPlayerReady,
+      'onStateChange': onPlayerStateChange
+    }
   });
 
   // Set up custom controls
   setupCustomControls();
 }
 
+function onPlayerReady(event) {
+  // Player is ready
+  updateVolumeUI();
+  updatePlaybackProgress();
+}
+
+function onPlayerStateChange(event) {
+  switch (event.data) {
+    case YT.PlayerState.PLAYING:
+      playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+      startProgressTimer();
+      break;
+    case YT.PlayerState.PAUSED:
+      playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+      stopProgressTimer();
+      break;
+    case YT.PlayerState.ENDED:
+      playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+      stopProgressTimer();
+      break;
+  }
+}
+
+let progressTimer = null;
+
+function startProgressTimer() {
+  stopProgressTimer();
+  progressTimer = setInterval(updatePlaybackProgress, 1000);
+}
+
+function stopProgressTimer() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+}
+
 function setupCustomControls() {
-  if (!vjsPlayer) return;
+  if (!ytPlayer) return;
 
   // Play/Pause
   playPauseBtn.addEventListener('click', togglePlayPause);
-  vjsPlayer.on('play', () => {
-    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-  });
-  vjsPlayer.on('pause', () => {
-    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-  });
 
   // Progress bar
-  vjsPlayer.on('timeupdate', updatePlaybackProgress);
   progressBar.addEventListener('click', seek);
-
-  // Set duration once metadata is loaded
-  vjsPlayer.one('loadedmetadata', () => {
-    const totalDuration = vjsPlayer.duration();
-    if (!isNaN(totalDuration) && isFinite(totalDuration)) {
-      duration.textContent = formatTime(totalDuration);
-    }
-  });
 
   // Volume control
   volumeBtn.addEventListener('click', toggleMute);
   volumeSlider.addEventListener('click', updateVolume);
-  vjsPlayer.on('volumechange', () => {
-    updateVolumeUI();
-  });
 
   // Playback speed
   const speedItems = speedOptions.querySelectorAll('[data-speed]');
   speedItems.forEach(item => {
     item.addEventListener('click', () => {
       const speed = parseFloat(item.dataset.speed);
-      vjsPlayer.playbackRate(speed);
+      ytPlayer.setPlaybackRate(speed);
       playbackSpeedBtn.innerHTML = `${speed}x`;
       speedOptions.classList.add('hidden');
     });
@@ -108,13 +144,16 @@ function setupCustomControls() {
 }
 
 function updatePlaybackProgress() {
-  const currentVideoTime = vjsPlayer.currentTime();
-  const totalDuration = vjsPlayer.duration();
+  if (!ytPlayer || !ytPlayer.getCurrentTime) return;
+
+  const currentVideoTime = ytPlayer.getCurrentTime();
+  const totalDuration = ytPlayer.getDuration();
 
   // Update current time display
-  document.getElementById('currentTime').textContent = formatTime(currentVideoTime);
+  currentTime.textContent = formatTime(currentVideoTime);
+  duration.textContent = formatTime(totalDuration);
 
-  // Update progress bar width based on current time relative to total duration
+  // Update progress bar width
   if (!isNaN(currentVideoTime) && !isNaN(totalDuration) && totalDuration > 0) {
     const progressPercent = (currentVideoTime / totalDuration) * 100;
     progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
@@ -122,41 +161,58 @@ function updatePlaybackProgress() {
 }
 
 function seek(event) {
+  if (!ytPlayer || !ytPlayer.getDuration) return;
+
   const rect = progressBar.getBoundingClientRect();
   const pos = (event.clientX - rect.left) / rect.width;
-  const totalDuration = vjsPlayer.duration();
+  const duration = ytPlayer.getDuration();
 
-  if (!isNaN(totalDuration) && totalDuration > 0) {
-    const seekTime = pos * totalDuration;
-    vjsPlayer.currentTime(Math.min(totalDuration, Math.max(0, seekTime)));
+  if (!isNaN(duration) && duration > 0) {
+    const seekTime = pos * duration;
+    ytPlayer.seekTo(seekTime, true);
   }
 }
 
 function togglePlayPause() {
-  if (vjsPlayer.paused()) {
-    vjsPlayer.play();
+  if (!ytPlayer) return;
+
+  const state = ytPlayer.getPlayerState();
+  if (state === YT.PlayerState.PLAYING) {
+    ytPlayer.pauseVideo();
   } else {
-    vjsPlayer.pause();
+    ytPlayer.playVideo();
   }
 }
 
 function toggleMute() {
-  vjsPlayer.muted(!vjsPlayer.muted());
+  if (!ytPlayer) return;
+
+  if (ytPlayer.isMuted()) {
+    ytPlayer.unMute();
+  } else {
+    ytPlayer.mute();
+  }
+  updateVolumeUI();
 }
 
 function updateVolume(event) {
+  if (!ytPlayer) return;
+
   const rect = volumeSlider.getBoundingClientRect();
   const volume = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-  vjsPlayer.volume(volume);
+  ytPlayer.setVolume(volume * 100);
   updateVolumeUI();
 }
 
 function updateVolumeUI() {
-  const volume = vjsPlayer.volume();
+  if (!ytPlayer) return;
+
+  const isMuted = ytPlayer.isMuted();
+  const volume = ytPlayer.getVolume() / 100;
+
   volumeLevel.style.width = `${volume * 100}%`;
 
-  // Update volume icon
-  if (vjsPlayer.muted() || volume === 0) {
+  if (isMuted || volume === 0) {
     volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
   } else if (volume < 0.5) {
     volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
@@ -166,11 +222,14 @@ function updateVolumeUI() {
 }
 
 function toggleFullscreen() {
-  if (vjsPlayer.isFullscreen()) {
-    vjsPlayer.exitFullscreen();
+  const playerElement = document.getElementById('player');
+  if (!playerElement) return;
+
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
     fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
   } else {
-    vjsPlayer.requestFullscreen();
+    playerElement.requestFullscreen();
     fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
   }
 }
@@ -264,42 +323,20 @@ async function playVideo(videoId) {
     const detailsResponse = await fetch(`/api/video/${videoId}`);
     const videoDetails = await detailsResponse.json();
 
-    // Debug logging
-    console.log('Video details response:', videoDetails);
-    console.log('Author data:', videoDetails.author);
-    console.log('View count:', videoDetails.view_count);
-    console.log('Published date:', videoDetails.published);
-
-    // Update video player UI with proper handling of different response formats
-    // Title handling
-    videoTitle.textContent = typeof videoDetails.title === 'string'
-      ? videoDetails.title
-      : videoDetails.title?.text || 'Unknown';
-
-    // Channel info
+    // Update video info UI
+    videoTitle.textContent = videoDetails.title || 'Unknown';
     channelName.textContent = videoDetails.author?.name || 'Unknown';
     channelName.href = `/channel/${videoDetails.author?.id || ''}`;
 
-    // Thumbnail handling with fallbacks
     if (videoDetails.author?.thumbnails && videoDetails.author.thumbnails.length > 0) {
       channelAvatar.src = videoDetails.author.thumbnails[0].url;
     } else {
       channelAvatar.src = '';
     }
 
-    // Additional metadata with safe access
-    subscriberCount.textContent = typeof videoDetails.author?.subscriber_count === 'string'
-      ? videoDetails.author.subscriber_count
-      : videoDetails.author?.subscriber_count?.text || '';
-
-    viewCount.textContent = typeof videoDetails.view_count === 'string'
-      ? videoDetails.view_count
-      : videoDetails.view_count?.text || '0 views';
-
-    uploadDate.textContent = typeof videoDetails.published === 'string'
-      ? videoDetails.published
-      : videoDetails.published?.text || '';
-
+    subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
+    viewCount.textContent = videoDetails.view_count || '0 views';
+    uploadDate.textContent = videoDetails.published || '';
     videoDescription.textContent = videoDetails.description || '';
 
     // Load comments
@@ -308,44 +345,15 @@ async function playVideo(videoId) {
     // Show video player
     videoPlayer.classList.remove('hidden');
 
-    // Initialize player after the element is visible
-    initializePlayer();
+    // Initialize YouTube player
+    initializePlayer(videoId);
 
-    // Set up video stream with selected quality
-    await updateVideoQuality(videoId);
   } catch (error) {
     showError('Failed to play video');
     console.error('Playback error:', error);
   } finally {
     hideLoading();
   }
-}
-
-async function updateVideoQuality(videoId) {
-  const quality = qualitySelect.value;
-  const currentTime = vjsPlayer && !isNaN(vjsPlayer.currentTime()) ? vjsPlayer.currentTime() : 0;
-
-  // Update video source
-  const videoUrl = `/api/stream/${videoId}?quality=${quality}`;
-
-  vjsPlayer.src({
-    src: videoUrl,
-    type: 'video/mp4'
-  });
-
-  // Load the video
-  vjsPlayer.load();
-
-  // If there was a previous position, seek to it
-  if (currentTime > 0) {
-    vjsPlayer.currentTime(currentTime);
-  }
-
-  // Start playback
-  vjsPlayer.play().catch(error => {
-    console.error('Playback error:', error);
-    showError('Failed to play video');
-  });
 }
 
 async function loadComments(videoId, continuation = null) {
@@ -428,10 +436,9 @@ loadMoreComments.addEventListener('click', () => {
 });
 
 function closeVideoPlayer() {
-  if (vjsPlayer) {
-    vjsPlayer.pause();
-    vjsPlayer.dispose();
-    vjsPlayer = null;
+  if (ytPlayer) {
+    ytPlayer.destroy();
+    ytPlayer = null;
   }
   videoPlayer.classList.add('hidden');
   currentVideoId = null;

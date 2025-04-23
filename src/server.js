@@ -135,68 +135,6 @@ function padZero(num) {
   return num.toString().padStart(2, '0');
 }
 
-// Stream video
-app.get('/api/stream/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { quality = 'best' } = req.query;
-
-    // Get video info first to determine available formats
-    const videoInfo = await youtubeDl(
-      `https://youtube.com/watch?v=${id}`,
-      {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCallHome: true
-      }
-    );
-
-    // Select format based on quality preference
-    let format = 'bestvideo+bestaudio/best';  // Default to highest quality video+audio
-    if (quality === 'audio') {
-      format = 'bestaudio';
-    } else if (quality === '720p') {
-      format = 'bestvideo[height<=720]+bestaudio/best[height<=720]';
-    } else if (quality === '1080p') {
-      format = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]';
-    }
-
-    // Set response headers
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    // Stream the video
-    const stream = youtubeDl.exec(
-      `https://youtube.com/watch?v=${id}`,
-      {
-        format: format,
-        output: '-',
-        quiet: true,
-        noWarnings: true,
-        noCallHome: true
-      },
-      { stdio: ['ignore', 'pipe', 'ignore'] }
-    );
-
-    // Handle stream events
-    stream.stdout.on('error', (error) => {
-      console.error('Stream error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Streaming failed' });
-      }
-    });
-
-    // Pipe the stream to response
-    stream.stdout.pipe(res);
-
-  } catch (error) {
-    console.error('Streaming error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-});
-
 // Get comments
 app.get('/api/comments/:id', async (req, res) => {
   try {
