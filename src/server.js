@@ -147,20 +147,18 @@ app.get('/api/stream/:id', async (req, res) => {
       {
         dumpSingleJson: true,
         noWarnings: true,
-        noCallHome: true,
-        preferFreeFormats: true,
-        youtubeSkipDashManifest: true
+        noCallHome: true
       }
     );
 
     // Select format based on quality preference
-    let format = 'best';
+    let format = 'bestvideo+bestaudio/best';  // Default to highest quality video+audio
     if (quality === 'audio') {
       format = 'bestaudio';
     } else if (quality === '720p') {
-      format = 'best[height<=720]';
+      format = 'bestvideo[height<=720]+bestaudio/best[height<=720]';
     } else if (quality === '1080p') {
-      format = 'best[height<=1080]';
+      format = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]';
     }
 
     // Set response headers
@@ -175,9 +173,7 @@ app.get('/api/stream/:id', async (req, res) => {
         output: '-',
         quiet: true,
         noWarnings: true,
-        noCallHome: true,
-        preferFreeFormats: true,
-        youtubeSkipDashManifest: true
+        noCallHome: true
       },
       { stdio: ['ignore', 'pipe', 'ignore'] }
     );
@@ -281,13 +277,21 @@ app.get('/api/download/:id', async (req, res) => {
     const { quality = 'best' } = req.query;
     const downloadDir = process.env.DOWNLOAD_DIR || './downloads';
 
+    // Select format based on quality preference
+    let format = 'bestvideo+bestaudio/best';  // Default to highest quality video+audio
+    if (quality === 'audio') {
+      format = 'bestaudio';
+    } else if (quality === '720p') {
+      format = 'bestvideo[height<=720]+bestaudio/best[height<=720]';
+    } else if (quality === '1080p') {
+      format = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]';
+    }
+
     const options = {
       output: join(downloadDir, '%(title)s.%(ext)s'),
-      format: quality,
+      format: format,
       noWarnings: true,
-      noCallHome: true,
-      preferFreeFormats: true,
-      youtubeSkipDashManifest: true
+      noCallHome: true
     };
 
     await youtubeDl(`https://youtube.com/watch?v=${id}`, options);
