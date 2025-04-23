@@ -126,6 +126,15 @@
   aspect-ratio: 16/9;
 }
 
+/* Hide video.js controls */
+.video-js .vjs-control-bar {
+  display: none !important;
+}
+
+.video-js .vjs-big-play-button {
+  display: none !important;
+}
+
 /* Custom controls */
 #customControls {
   position: relative;
@@ -135,6 +144,9 @@
 #progressBar {
   height: 4px;
   transition: height 0.2s;
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
 }
 
 #progressBar:hover {
@@ -142,6 +154,11 @@
 }
 
 #progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #e53e3e;
   transition: width 0.1s linear;
 }
 

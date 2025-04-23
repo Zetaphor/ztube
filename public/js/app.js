@@ -74,8 +74,16 @@ function setupCustomControls() {
   });
 
   // Progress bar
-  vjsPlayer.on('timeupdate', updateProgress);
+  vjsPlayer.on('timeupdate', updatePlaybackProgress);
   progressBar.addEventListener('click', seek);
+
+  // Set duration once metadata is loaded
+  vjsPlayer.one('loadedmetadata', () => {
+    const totalDuration = vjsPlayer.duration();
+    if (!isNaN(totalDuration) && isFinite(totalDuration)) {
+      duration.textContent = formatTime(totalDuration);
+    }
+  });
 
   // Volume control
   volumeBtn.addEventListener('click', toggleMute);
@@ -97,11 +105,31 @@ function setupCustomControls() {
 
   // Fullscreen
   fullscreenBtn.addEventListener('click', toggleFullscreen);
+}
 
-  // Update duration once metadata is loaded
-  vjsPlayer.on('loadedmetadata', () => {
-    duration.textContent = formatTime(vjsPlayer.duration());
-  });
+function updatePlaybackProgress() {
+  const currentVideoTime = vjsPlayer.currentTime();
+  const totalDuration = vjsPlayer.duration();
+
+  // Update current time display
+  document.getElementById('currentTime').textContent = formatTime(currentVideoTime);
+
+  // Update progress bar width based on current time relative to total duration
+  if (!isNaN(currentVideoTime) && !isNaN(totalDuration) && totalDuration > 0) {
+    const progressPercent = (currentVideoTime / totalDuration) * 100;
+    progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
+  }
+}
+
+function seek(event) {
+  const rect = progressBar.getBoundingClientRect();
+  const pos = (event.clientX - rect.left) / rect.width;
+  const totalDuration = vjsPlayer.duration();
+
+  if (!isNaN(totalDuration) && totalDuration > 0) {
+    const seekTime = pos * totalDuration;
+    vjsPlayer.currentTime(Math.min(totalDuration, Math.max(0, seekTime)));
+  }
 }
 
 function togglePlayPause() {
@@ -110,18 +138,6 @@ function togglePlayPause() {
   } else {
     vjsPlayer.pause();
   }
-}
-
-function updateProgress() {
-  const percent = (vjsPlayer.currentTime() / vjsPlayer.duration()) * 100;
-  progress.style.width = `${percent}%`;
-  currentTime.textContent = formatTime(vjsPlayer.currentTime());
-}
-
-function seek(event) {
-  const rect = progressBar.getBoundingClientRect();
-  const pos = (event.clientX - rect.left) / rect.width;
-  vjsPlayer.currentTime(pos * vjsPlayer.duration());
 }
 
 function toggleMute() {
@@ -160,6 +176,7 @@ function toggleFullscreen() {
 }
 
 function formatTime(seconds) {
+  if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
