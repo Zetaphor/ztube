@@ -9,12 +9,13 @@
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "youtubei.js": "^9.1.0",
-    "youtube-dl-exec": "^2.5.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
-    "ejs": "^3.1.9"
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "video.js": "^8.22.0",
+    "youtube-dl-exec": "^2.5.6",
+    "youtubei.js": "^9.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

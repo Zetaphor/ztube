@@ -118,3 +118,69 @@
 #videoDescription::-webkit-scrollbar-thumb:hover {
   background: #ccc;
 }
+
+/* Video.js custom styles */
+.video-js {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16/9;
+}
+
+.video-js .vjs-control-bar {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.video-js .vjs-progress-control {
+  position: absolute;
+  width: 100%;
+  top: -10px;
+  height: 10px;
+}
+
+.video-js .vjs-progress-control .vjs-progress-holder {
+  margin: 0;
+  height: 10px;
+  border-radius: 0;
+}
+
+.video-js .vjs-play-progress {
+  background-color: #e53e3e;
+  /* Red color for the progress bar */
+}
+
+.video-js .vjs-load-progress {
+  background: rgba(255, 255, 255, 0.3);
+  /* Buffer color */
+}
+
+.video-js .vjs-time-tooltip {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.video-js .vjs-big-play-button {
+  background-color: rgba(229, 62, 62, 0.8);
+  /* Red color for the play button */
+  border-color: transparent;
+  border-radius: 50%;
+  height: 80px;
+  width: 80px;
+  line-height: 80px;
+  left: 50%;
+  top: 50%;
+  margin-left: -40px;
+  margin-top: -40px;
+  font-size: 50px;
+}
+
+.video-js:hover .vjs-big-play-button,
+.video-js .vjs-big-play-button:focus,
+.video-js .vjs-big-play-button:active {
+  background-color: rgba(229, 62, 62, 0.9);
+  /* Slightly brighter red on hover */
+}
+
+.video-js .vjs-playback-rate {
+  font-size: 14px;
+}

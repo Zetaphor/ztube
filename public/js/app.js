@@ -3,7 +3,6 @@ const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
 const content = document.getElementById('content');
 const videoPlayer = document.getElementById('videoPlayer');
-const player = document.getElementById('player');
 const closePlayer = document.getElementById('closePlayer');
 const videoTitle = document.getElementById('videoTitle');
 const channelAvatar = document.getElementById('channelAvatar');
@@ -18,6 +17,7 @@ const loadMoreComments = document.getElementById('loadMoreComments');
 
 let currentVideoId = null;
 let commentsNextPage = null;
+let vjsPlayer = null;
 
 // Event Listeners
 searchButton.addEventListener('click', performSearch);
@@ -31,7 +31,33 @@ qualitySelect.addEventListener('change', () => {
   }
 });
 
-// Functions
+// Initialize video.js player
+function initializePlayer() {
+  if (vjsPlayer) {
+    vjsPlayer.dispose();
+  }
+
+  vjsPlayer = videojs('player', {
+    preload: 'auto',
+    controls: true,
+    fluid: true,
+    playbackRates: [0.5, 1, 1.25, 1.5, 2],
+    controlBar: {
+      children: [
+        'playToggle',
+        'progressControl',
+        'currentTimeDisplay',
+        'timeDivider',
+        'durationDisplay',
+        'volumePanel',
+        'playbackRateMenuButton',
+        'fullscreenToggle'
+      ]
+    }
+  });
+}
+
+// Search Functions
 async function performSearch() {
   const query = searchInput.value.trim();
   if (!query) return;
@@ -39,11 +65,11 @@ async function performSearch() {
   try {
     showLoading();
     const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
-    const results = await response.json();
-    displayResults(results);
+    const data = await response.json();
+    displayResults(data);
   } catch (error) {
-    showError('Failed to perform search');
     console.error('Search error:', error);
+    content.innerHTML = '<div class="col-span-full text-center py-10 text-red-600">Search failed. Please try again.</div>';
   } finally {
     hideLoading();
   }
@@ -51,6 +77,11 @@ async function performSearch() {
 
 function displayResults(results) {
   content.innerHTML = '';
+
+  if (!results || !results.length) {
+    content.innerHTML = '<div class="col-span-full text-center py-10 text-gray-600">No results found</div>';
+    return;
+  }
 
   results.forEach(video => {
     const card = createVideoCard(video);
@@ -149,11 +180,14 @@ async function playVideo(videoId) {
     // Load comments
     await loadComments(videoId);
 
-    // Set up video stream with selected quality
-    await updateVideoQuality(videoId);
-
     // Show video player
     videoPlayer.classList.remove('hidden');
+
+    // Initialize player after the element is visible
+    initializePlayer();
+
+    // Set up video stream with selected quality
+    await updateVideoQuality(videoId);
   } catch (error) {
     showError('Failed to play video');
     console.error('Playback error:', error);
@@ -164,14 +198,26 @@ async function playVideo(videoId) {
 
 async function updateVideoQuality(videoId) {
   const quality = qualitySelect.value;
-  const currentTime = player.currentTime;
+  const currentTime = vjsPlayer && !isNaN(vjsPlayer.currentTime()) ? vjsPlayer.currentTime() : 0;
 
   // Update video source
-  player.src = `/api/stream/${videoId}?quality=${quality}`;
+  const videoUrl = `/api/stream/${videoId}?quality=${quality}`;
 
-  // Restore playback position
-  player.currentTime = currentTime;
-  player.play().catch(error => {
+  vjsPlayer.src({
+    src: videoUrl,
+    type: 'video/mp4'
+  });
+
+  // Load the video
+  vjsPlayer.load();
+
+  // If there was a previous position, seek to it
+  if (currentTime > 0) {
+    vjsPlayer.currentTime(currentTime);
+  }
+
+  // Start playback
+  vjsPlayer.play().catch(error => {
     console.error('Playback error:', error);
     showError('Failed to play video');
   });
@@ -257,8 +303,11 @@ loadMoreComments.addEventListener('click', () => {
 });
 
 function closeVideoPlayer() {
-  player.pause();
-  player.src = '';
+  if (vjsPlayer) {
+    vjsPlayer.pause();
+    vjsPlayer.dispose();
+    vjsPlayer = null;
+  }
   videoPlayer.classList.add('hidden');
   currentVideoId = null;
   commentsNextPage = null;
