@@ -61,6 +61,44 @@ When streaming or downloading videos, you can specify the following quality opti
 - `720p` - HD (1280x720)
 - `audio` - Audio-only stream
 
+## Running as an Electron App
+
+This application can also be run as a desktop application using Electron.
+
+### Development
+
+To run the app in development mode with Electron:
+
+```bash
+npm run electron:dev
+```
+
+This will start the app with developer tools enabled.
+
+### Production
+
+To run the app in production mode with Electron:
+
+```bash
+npm run electron
+```
+
+### Building the Electron App
+
+To package the app for distribution:
+
+```bash
+# For all platforms
+npm run build
+
+# For specific platforms
+npm run build:linux
+npm run build:mac
+npm run build:win
+```
+
+The packaged app will be available in the `dist` directory.
+
 ## License
 
 MIT

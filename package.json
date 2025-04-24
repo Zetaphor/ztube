@@ -2,20 +2,65 @@
   "name": "ztube",
   "version": "1.0.0",
   "description": "A full-featured YouTube client",
-  "main": "src/server.js",
+  "main": "main.cjs",
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "electron": "electron .",
+    "electron:dev": "cross-env ELECTRON_DEV=true electron .",
+    "build": "electron-builder",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "package": "electron-builder --dir"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "ejs": "^3.1.9",
     "express": "^4.18.2",
+    "youtube-dl-exec": "^2.4.17",
     "youtubei.js": "^9.1.0"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1",
     "nodemon": "^3.0.3"
+  },
+  "build": {
+    "appId": "com.zetaphor.ztube",
+    "productName": "ZTube",
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/.{git,svn,github,hg}/**",
+      "!.env",
+      "!.env.example"
+    ],
+    "directories": {
+      "buildResources": "resources"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "AudioVideo"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    }
   }
 }
