@@ -31,6 +31,7 @@ const fullscreenBtn = document.getElementById('fullscreenBtn');
 let currentVideoId = null;
 let commentsNextPage = null;
 let ytPlayer = null;
+let progressTimer = null;
 
 // Event Listeners
 searchButton.addEventListener('click', performSearch);
@@ -55,8 +56,6 @@ function initializePlayer(videoId) {
   }
 
   ytPlayer = new YT.Player('player', {
-    height: '390',
-    width: '640',
     videoId: videoId,
     playerVars: {
       'playsinline': 1,
@@ -66,11 +65,18 @@ function initializePlayer(videoId) {
       'modestbranding': 1,
       'showinfo': 0,
       'iv_load_policy': 3,
-      'fs': 0 // Disable fullscreen button since we have our own
+      'fs': 0, // Disable fullscreen button since we have our own
+      'autoplay': 1, // Enable autoplay
+      'mute': 1, // Initially mute (required for autoplay in most browsers)
+      'enablejsapi': 1, // Enable JS API
+      'origin': window.location.origin, // Set origin for security
+      'widget_referrer': window.location.href, // Set referrer
+      'autohide': 1 // Hide YouTube controls
     },
     events: {
       'onReady': onPlayerReady,
-      'onStateChange': onPlayerStateChange
+      'onStateChange': onPlayerStateChange,
+      'onError': onPlayerError
     }
   });
 
@@ -80,36 +86,76 @@ function initializePlayer(videoId) {
 
 function onPlayerReady(event) {
   // Player is ready
-  updateVolumeUI();
+  event.target.playVideo(); // Ensure video starts playing
+  event.target.unMute(); // Unmute after autoplay starts
+  playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Update the play button to show pause
+
+  // Initial update of time display and progress
   updatePlaybackProgress();
+
+  // Start progress timer to continuously update
+  startProgressTimer();
+
+  // Update volume UI
+  updateVolumeUI();
+
+  // Add a fallback to ensure time updates work
+  // This helps with possible initialization timing issues
+  setTimeout(() => {
+    updatePlaybackProgress();
+    if (!progressTimer) {
+      startProgressTimer();
+    }
+  }, 1000);
 }
 
 function onPlayerStateChange(event) {
+  // First update the play/pause button
   switch (event.data) {
     case YT.PlayerState.PLAYING:
       playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+      // Update immediately when playing starts
+      updatePlaybackProgress();
+      // Then start the timer
       startProgressTimer();
       break;
     case YT.PlayerState.PAUSED:
       playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+      // Update immediately when paused
+      updatePlaybackProgress();
+      // Then stop the timer
       stopProgressTimer();
       break;
     case YT.PlayerState.ENDED:
       playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+      // Update immediately when ended
+      updatePlaybackProgress();
+      // Then stop the timer
       stopProgressTimer();
+      break;
+    case YT.PlayerState.BUFFERING:
+      // For buffering, keep the timer running if it's not already
+      if (progressTimer === null) {
+        startProgressTimer();
+      }
       break;
   }
 }
 
-let progressTimer = null;
-
 function startProgressTimer() {
+  // First stop any existing timer
   stopProgressTimer();
-  progressTimer = setInterval(updatePlaybackProgress, 1000);
+
+  // Only start timer if player is initialized and ready
+  if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+    // Update more frequently for smoother time display
+    progressTimer = setInterval(updatePlaybackProgress, 250);
+  }
 }
 
 function stopProgressTimer() {
-  if (progressTimer) {
+  // Only try to clear if the timer exists
+  if (progressTimer !== null) {
     clearInterval(progressTimer);
     progressTimer = null;
   }
@@ -121,8 +167,18 @@ function setupCustomControls() {
   // Play/Pause
   playPauseBtn.addEventListener('click', togglePlayPause);
 
-  // Progress bar
+  // Progress bar - add both click and touch support
   progressBar.addEventListener('click', seek);
+  progressBar.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (e.changedTouches && e.changedTouches[0]) {
+      const touchEvent = {
+        clientX: e.changedTouches[0].clientX,
+        clientY: e.changedTouches[0].clientY
+      };
+      seek(touchEvent);
+    }
+  });
 
   // Volume control
   volumeBtn.addEventListener('click', toggleMute);
@@ -144,32 +200,56 @@ function setupCustomControls() {
 }
 
 function updatePlaybackProgress() {
-  if (!ytPlayer || !ytPlayer.getCurrentTime) return;
+  if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
 
-  const currentVideoTime = ytPlayer.getCurrentTime();
-  const totalDuration = ytPlayer.getDuration();
+  try {
+    const currentVideoTime = ytPlayer.getCurrentTime() || 0;
+    const totalDuration = ytPlayer.getDuration() || 0;
 
-  // Update current time display
-  currentTime.textContent = formatTime(currentVideoTime);
-  duration.textContent = formatTime(totalDuration);
+    // Update current time display
+    currentTime.textContent = formatTime(currentVideoTime);
 
-  // Update progress bar width
-  if (!isNaN(currentVideoTime) && !isNaN(totalDuration) && totalDuration > 0) {
-    const progressPercent = (currentVideoTime / totalDuration) * 100;
-    progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
+    // Update duration display - handle live streams where duration might be 0
+    if (totalDuration > 0) {
+      duration.textContent = formatTime(totalDuration);
+    } else {
+      // For live events or when duration is not available
+      duration.textContent = 'LIVE';
+    }
+
+    // Update progress bar width
+    if (!isNaN(currentVideoTime) && !isNaN(totalDuration) && totalDuration > 0) {
+      const progressPercent = (currentVideoTime / totalDuration) * 100;
+      progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
+    } else {
+      // For live streams, show progress at current position
+      progress.style.width = '100%';
+    }
+  } catch (error) {
+    console.error('Error updating playback progress:', error);
   }
 }
 
 function seek(event) {
-  if (!ytPlayer || !ytPlayer.getDuration) return;
+  if (!ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
 
   const rect = progressBar.getBoundingClientRect();
   const pos = (event.clientX - rect.left) / rect.width;
   const duration = ytPlayer.getDuration();
 
-  if (!isNaN(duration) && duration > 0) {
+  // Check if duration is valid
+  if (duration && duration > 0) {
     const seekTime = pos * duration;
     ytPlayer.seekTo(seekTime, true);
+
+    // Force immediate UI update for better user experience
+    setTimeout(() => {
+      updatePlaybackProgress();
+      // Ensure timer is running
+      if (progressTimer === null) {
+        startProgressTimer();
+      }
+    }, 50);
   }
 }
 
@@ -235,10 +315,18 @@ function toggleFullscreen() {
 }
 
 function formatTime(seconds) {
-  if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
+  if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
+
+  // Handle hours for longer videos
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 // Search Functions
@@ -495,4 +583,10 @@ function showError(message) {
   error.textContent = message;
   document.body.appendChild(error);
   setTimeout(() => error.remove(), 3000);
+}
+
+// Add player error handling
+function onPlayerError(event) {
+  console.error('YouTube player error:', event.data);
+  showError('Video playback error. Please try again.');
 }
