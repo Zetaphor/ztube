@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 import { Innertube } from 'youtubei.js';
-import youtubeDl from 'youtube-dl-exec';
 
 // Load environment variables
 dotenv.config();
@@ -199,41 +198,6 @@ app.get('/api/channel/:id', async (req, res) => {
     const { id } = req.params;
     const channel = await youtube.getChannel(id);
     res.json(channel);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Download video (if enabled)
-app.get('/api/download/:id', async (req, res) => {
-  if (!process.env.ENABLE_DOWNLOADS === 'true') {
-    return res.status(403).json({ error: 'Downloads are disabled' });
-  }
-
-  try {
-    const { id } = req.params;
-    const { quality = 'best' } = req.query;
-    const downloadDir = process.env.DOWNLOAD_DIR || './downloads';
-
-    // Select format based on quality preference
-    let format = 'bestvideo+bestaudio/best';  // Default to highest quality video+audio
-    if (quality === 'audio') {
-      format = 'bestaudio';
-    } else if (quality === '720p') {
-      format = 'bestvideo[height<=720]+bestaudio/best[height<=720]';
-    } else if (quality === '1080p') {
-      format = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]';
-    }
-
-    const options = {
-      output: join(downloadDir, '%(title)s.%(ext)s'),
-      format: format,
-      noWarnings: true,
-      noCallHome: true
-    };
-
-    await youtubeDl(`https://youtube.com/watch?v=${id}`, options);
-    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
