@@ -625,30 +625,41 @@ async function performSearch() {
   const query = searchInput.value.trim();
   if (!query) return;
 
-  try {
-    showLoading();
-    const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
-    const data = await response.json();
-    displayResults(data);
-  } catch (error) {
-    console.error('Search error:', error);
-    content.innerHTML = '<div class="col-span-full text-center py-10 text-red-600">Search failed. Please try again.</div>';
-  } finally {
-    hideLoading();
+  // Check if we are on the main page (has #content)
+  const mainContentElement = document.getElementById('content');
+
+  if (mainContentElement) {
+    // We are on the index page, perform search and display results here
+    try {
+      showLoading();
+      const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      displayResults(data, mainContentElement); // Pass the content element
+    } catch (error) {
+      console.error('Search error:', error);
+      // Use mainContentElement here as well
+      mainContentElement.innerHTML = '<div class="col-span-full text-center py-10 text-red-600">Search failed. Please try again.</div>';
+    } finally {
+      hideLoading();
+    }
+  } else {
+    // Not on the index page (e.g., channel page), redirect to index with query
+    console.log('Redirecting to index page for search...');
+    window.location.href = `/?query=${encodeURIComponent(query)}`;
   }
 }
 
-function displayResults(results) {
-  content.innerHTML = '';
+function displayResults(results, targetElement) {
+  targetElement.innerHTML = ''; // Use the passed element
 
   if (!results || !results.length) {
-    content.innerHTML = '<div class="col-span-full text-center py-10 text-gray-600">No results found</div>';
+    targetElement.innerHTML = '<div class="col-span-full text-center py-10 text-gray-600">No results found</div>'; // Use the passed element
     return;
   }
 
   results.forEach(video => {
     const card = createVideoCard(video);
-    content.appendChild(card);
+    targetElement.appendChild(card); // Use the passed element
   });
 }
 
@@ -712,100 +723,6 @@ function createVideoCard(video) {
     `;
 
   return card;
-}
-
-// New Global Function to Load and Display Video Player
-// Assign to window to make it truly global
-window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
-  // Get player overlay elements dynamically
-  const videoPlayer = document.getElementById('videoPlayer');
-  const channelAvatar = document.getElementById('channelAvatar');
-  const uploadDate = document.getElementById('uploadDate');
-  const videoTitle = document.getElementById('videoTitle');
-  const channelName = document.getElementById('channelName');
-  const subscriberCount = document.getElementById('subscriberCount');
-  const viewCount = document.getElementById('viewCount');
-  const videoDescription = document.getElementById('videoDescription');
-  const commentsList = document.getElementById('commentsList'); // Needed for loadComments
-  const loadMoreComments = document.getElementById('loadMoreComments'); // Needed for loadComments
-
-  if (!videoPlayer) {
-    console.error('Video player element not found!');
-    return;
-  }
-
-  try {
-    showLoading();
-    currentVideoId = videoId;
-    document.body.classList.add('overflow-hidden');
-
-    // --- Get and display date from card immediately ---
-    const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
-    if (uploadedDateFromCard && uploadDate) {
-      uploadDate.textContent = uploadedDateFromCard;
-    }
-
-    // --- Get avatar from card if available ---
-    const channelAvatarElement = videoCardElement?.querySelector('img[alt*="avatar"]');
-    const channelAvatarUrlFromCard = channelAvatarElement?.src;
-    if (channelAvatar && channelAvatarUrlFromCard && (channelAvatarUrlFromCard.startsWith('http') || channelAvatarUrlFromCard.startsWith('/'))) {
-      channelAvatar.src = channelAvatarUrlFromCard;
-    } else if (channelAvatar) {
-      channelAvatar.src = '/img/default-avatar.svg'; // Fallback
-    }
-    // --- End immediate avatar display ---
-
-    // Get video details
-    const detailsResponse = await fetch(`/api/video/${videoId}`);
-    if (!detailsResponse.ok) {
-      const errorData = await detailsResponse.json();
-      throw new Error(errorData.error || `Failed to fetch video details: ${detailsResponse.status}`);
-    }
-    const videoDetails = await detailsResponse.json();
-
-    // Store chapters globally for this video
-    videoChapters = videoDetails.chapters || [];
-
-    // Update video info UI (with null checks for elements)
-    if (videoTitle) videoTitle.textContent = videoDetails.title || 'Unknown';
-    if (channelName) channelName.textContent = videoDetails.author?.name || 'Unknown';
-    if (channelName) channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#';
-
-    // Update avatar if details provide a better one
-    if (channelAvatar && videoDetails.author?.thumbnails?.[0]?.url) {
-      channelAvatar.src = videoDetails.author.thumbnails[0].url;
-    }
-
-    if (subscriberCount) subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
-    if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views';
-    if (videoDescription) videoDescription.textContent = videoDetails.description || '';
-
-    // Update upload date only if needed (with null check)
-    if (!uploadedDateFromCard && videoDetails.published && uploadDate) {
-      uploadDate.textContent = videoDetails.published;
-    }
-
-    // Load comments (passing the dynamically fetched elements)
-    await loadComments(videoId, null, commentsList, loadMoreComments);
-
-    // Show video player
-    videoPlayer.classList.remove('hidden');
-
-    // Fetch SponsorBlock data
-    fetchSponsorBlockSegments(videoId);
-
-    // Initialize YouTube player
-    initializePlayer(videoId);
-
-  } catch (error) {
-    showError(`Failed to play video: ${error.message}`);
-    console.error('Playback error:', error);
-    // Clean up if loading fails
-    closeVideoPlayer(); // Ensure player closes on error
-  } finally {
-    hideLoading();
-  }
-  console.log("app.js: window.loadAndDisplayVideo defined", typeof window.loadAndDisplayVideo);
 }
 
 // Existing function now calls the new global one
@@ -1332,3 +1249,22 @@ function updateQualityDisplay(quality, qualityBtn) { // Accept button as arg
   };
   qualityBtn.textContent = qualityMap[quality] || quality; // Fallback to raw quality name
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Check for search query in URL on page load (specifically for index page)
+  const urlParams = new URLSearchParams(window.location.search);
+  const queryParam = urlParams.get('query');
+  const searchInput = document.getElementById('searchInput'); // Get it here
+  const content = document.getElementById('content'); // Check if we are on index
+
+  if (queryParam && searchInput && content) {
+    console.log('Found query parameter, performing search:', queryParam);
+    searchInput.value = queryParam; // Populate the search bar
+    performSearch(); // Trigger the search automatically
+  }
+
+  // Add other initializations if needed
+  console.log('DOM Loaded. app.js initialized.');
+  console.log('Checking window.loadAndDisplayVideo on DOMContentLoaded:', typeof window.loadAndDisplayVideo);
+
+});
