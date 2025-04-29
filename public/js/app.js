@@ -53,18 +53,9 @@ let keydownAttached = false; // Track if the listener is attached
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
-  // Get player overlay elements dynamically
-  const videoPlayer = document.getElementById('videoPlayer');
-  const channelAvatar = document.getElementById('channelAvatar');
-  const uploadDate = document.getElementById('uploadDate');
-  const videoTitle = document.getElementById('videoTitle');
-  const channelName = document.getElementById('channelName');
-  const subscriberCount = document.getElementById('subscriberCount');
-  const viewCount = document.getElementById('viewCount');
-  const videoDescription = document.getElementById('videoDescription');
-  const commentsList = document.getElementById('commentsList'); // Needed for loadComments
-  const loadMoreComments = document.getElementById('loadMoreComments'); // Needed for loadComments
+  // REMOVED bulk getElementById calls from here
 
+  const videoPlayer = document.getElementById('videoPlayer'); // Keep this check early
   if (!videoPlayer) {
     console.error('Video player element not found!');
     return;
@@ -75,24 +66,15 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     currentVideoId = videoId;
     document.body.classList.add('overflow-hidden');
 
-    // --- Get and display date from card immediately (check if card exists) ---
+    // --- Get and display date from card immediately ---
     const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
+    const uploadDate = document.getElementById('uploadDate'); // Get element here
     if (uploadedDateFromCard && uploadDate) {
       uploadDate.textContent = uploadedDateFromCard;
     } else if (uploadDate) {
-      // Clear or set default if no card info
       uploadDate.textContent = '';
     }
-
-    // --- Get avatar from card if available (check if card exists) ---
-    const channelAvatarElement = videoCardElement?.querySelector('img[alt*="avatar"]');
-    const channelAvatarUrlFromCard = channelAvatarElement?.src;
-    if (channelAvatar && channelAvatarUrlFromCard && (channelAvatarUrlFromCard.startsWith('http') || channelAvatarUrlFromCard.startsWith('/'))) {
-      channelAvatar.src = channelAvatarUrlFromCard;
-    } else if (channelAvatar) {
-      channelAvatar.src = '/img/default-avatar.svg'; // Fallback
-    }
-    // --- End immediate avatar display ---
+    // --- End immediate date display ---
 
     // Get video details
     const detailsResponse = await fetch(`/api/video/${videoId}`);
@@ -102,32 +84,80 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     }
     const videoDetails = await detailsResponse.json();
 
+    // --- DEBUGGING LOGS (PART 1) ---
+    console.log("Video Details Received:", JSON.stringify(videoDetails, null, 2));
+    console.log("Attempting to access avatar URL:", videoDetails?.secondary_info?.owner?.author?.thumbnails?.[0]?.url);
+    // --- END DEBUGGING LOGS (PART 1) ---
+
     // Store chapters globally for this video
     videoChapters = videoDetails.chapters || [];
 
-    // Update video info UI (with null checks for elements)
+    // Update video info UI
+    const videoTitle = document.getElementById('videoTitle');
     if (videoTitle) videoTitle.textContent = videoDetails.title || 'Unknown';
-    if (channelName) channelName.textContent = videoDetails.author?.name || 'Unknown';
-    if (channelName) channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#';
 
-    // Update avatar if details provide a better one (or if no card info was used)
-    if (channelAvatar && (!channelAvatarUrlFromCard || videoDetails.author?.thumbnails?.[0]?.url)) {
-      channelAvatar.src = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
+    const channelName = document.getElementById('channelName');
+    if (channelName) channelName.textContent = videoDetails.secondary_info?.owner?.author?.name || 'Unknown';
+    if (channelName) channelName.href = videoDetails.secondary_info?.owner?.author?.id ? `/channel/${videoDetails.secondary_info?.owner?.author?.id}` : '#';
+
+    // Update avatar link and image
+    const channelAvatarLink = document.getElementById('channelAvatarLink'); // Get the new link element
+    const channelAvatar = document.getElementById('channelAvatar');
+    const channelIdForLink = videoDetails.secondary_info?.owner?.author?.id; // Store ID for link and listeners
+
+    if (channelAvatarLink && channelIdForLink) {
+      channelAvatarLink.href = `/channel/${channelIdForLink}`;
     }
 
-    if (subscriberCount) subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
-    if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views';
+    // --- DEBUGGING LOGS (PART 2) ---
+    console.log("Channel Avatar DOM Element:", channelAvatar);
+    // --- END DEBUGGING LOGS (PART 3) ---
+    if (channelAvatar) {
+      channelAvatar.src = videoDetails.secondary_info?.owner?.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
+      // --- DEBUGGING LOGS (PART 3) ---
+      console.log("Set channelAvatar.src to:", channelAvatar.src);
+      // --- END DEBUGGING LOGS (PART 3) ---
+    }
+
+    // --- Add Hover Effect Listeners ---
+    if (channelAvatarLink && channelName) {
+      const addHoverEffect = () => channelName.classList.add('text-green-500'); // Force hover style
+      const removeHoverEffect = () => channelName.classList.remove('text-green-500');
+
+      channelAvatarLink.addEventListener('mouseenter', addHoverEffect);
+      channelAvatarLink.addEventListener('mouseleave', removeHoverEffect);
+      channelName.addEventListener('mouseenter', addHoverEffect);
+      channelName.addEventListener('mouseleave', removeHoverEffect);
+    }
+    // --- End Hover Effect Listeners ---
+
+    // Get subscriber count
+    const subscriberCount = document.getElementById('subscriberCount');
+    if (subscriberCount) subscriberCount.textContent = videoDetails.secondary_info?.owner?.subscriber_count?.text || '';
+
+    // Get view count
+    const viewCount = document.getElementById('viewCount');
+    if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views'; // Assuming view_count is top-level
+
+    // Get description
+    const videoDescription = document.getElementById('videoDescription');
     if (videoDescription) videoDescription.textContent = videoDetails.description || '';
 
-    // Update upload date only if needed (with null check and if not set from card)
-    if (!uploadedDateFromCard && videoDetails.published && uploadDate) {
-      uploadDate.textContent = videoDetails.published;
-    } else if (!uploadedDateFromCard && uploadDate) {
-      uploadDate.textContent = 'Unknown date'; // Set fallback if no info
+    // Update upload date (if not set from card)
+    // Re-fetch uploadDate element in case it wasn't fetched earlier
+    const uploadDateForDetails = document.getElementById('uploadDate');
+    if (!uploadedDateFromCard && videoDetails.published && uploadDateForDetails) {
+      uploadDateForDetails.textContent = videoDetails.published;
+    } else if (!uploadedDateFromCard && uploadDateForDetails) {
+      uploadDateForDetails.textContent = 'Unknown date';
     }
 
-    // Load comments (passing the dynamically fetched elements)
-    await loadComments(videoId, null, commentsList, loadMoreComments);
+    // Load comments
+    const commentsList = document.getElementById('commentsList');
+    const loadMoreComments = document.getElementById('loadMoreComments');
+    if (commentsList && loadMoreComments) {
+      await loadComments(videoId, null, commentsList, loadMoreComments);
+    }
 
     // Fetch and display recommended videos
     fetchRecommendedVideos(videoId);
@@ -710,9 +740,6 @@ function createVideoCard(video) {
   // Get thumbnail URL
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
 
-  // Get channel avatar URL
-  const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
-
   // Get duration (already formatted from server)
   const duration = video.duration || '0:00';
 
@@ -725,8 +752,8 @@ function createVideoCard(video) {
   // Add data attribute
   card.dataset.uploadedat = uploadedAt;
 
-  // Update onclick to pass the card element AND the avatar URL
-  card.onclick = () => playVideo(video.id, card, channelAvatarUrl);
+  // Update onclick to pass the card element ONLY
+  card.onclick = () => playVideo(video.id, card);
 
   // Get channel name with verified badge if applicable
   const channelNameText = video.channel?.name || 'Unknown'; // Use Text for display
@@ -739,6 +766,8 @@ function createVideoCard(video) {
   const channelLinkContent = channelId ?
     `<a href="/channel/${channelId}" class="hover:text-green-500 truncate" onclick="event.stopPropagation();">${channelNameText}${verifiedBadge}</a>` :
     `<span class="truncate">${channelNameText}${verifiedBadge}</span>`; // Non-clickable if no ID
+
+  const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
 
   card.innerHTML = `
         <div class="video-thumbnail">
@@ -1338,7 +1367,7 @@ function displayRecommendedVideos(videos) {
 
 function createRecommendedVideoCard(video) {
   const card = document.createElement('div');
-  card.className = 'recommended-video-card'; // Use the new CSS class
+  card.className = 'recommended-video-card';
 
   // Get thumbnail URL (prefer smaller ones if available)
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
@@ -1358,6 +1387,8 @@ function createRecommendedVideoCard(video) {
 
   // Make card clickable to load the video (pass null for element, as it's a recommendation card)
   card.onclick = () => window.loadAndDisplayVideo(video.id, null);
+
+  const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
 
   card.innerHTML = `
     <div class="recommended-thumbnail">

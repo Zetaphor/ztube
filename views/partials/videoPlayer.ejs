@@ -83,7 +83,10 @@
         </div>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
-            <img id="channelAvatar" class="w-12 h-12 rounded-full mr-3" src="" alt="">
+            <!-- Wrap image in a link -->
+            <a id="channelAvatarLink" href="#" class="mr-3 flex-shrink-0">
+              <img id="channelAvatar" class="w-12 h-12 rounded-full" src="" alt="Channel avatar">
+            </a>
             <div>
               <a id="channelName" href="#" class="font-medium text-lg text-zinc-200 hover:text-green-500"></a>
               <p id="subscriberCount" class="text-zinc-400 text-sm"></p>
