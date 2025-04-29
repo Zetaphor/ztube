@@ -2,30 +2,28 @@
 const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
 const content = document.getElementById('content');
+
+// Remove definitions for elements inside the player overlay
+/*
 const videoPlayer = document.getElementById('videoPlayer');
 const playerContainer = document.getElementById('player');
 const videoAreaContainer = document.getElementById('videoAreaContainer');
 const customControls = document.getElementById('customControls');
-const closePlayer = document.getElementById('closePlayer');
+const closePlayer = document.getElementById('closePlayer'); // Keep this? No, get it inside closeVideoPlayer
 const videoTitle = document.getElementById('videoTitle');
 const channelAvatar = document.getElementById('channelAvatar');
 const channelName = document.getElementById('channelName');
 const videoDescription = document.getElementById('videoDescription');
-// const qualitySelect = document.getElementById('qualitySelect'); // Removed - Element missing in HTML
 const subscriberCount = document.getElementById('subscriberCount');
 const viewCount = document.getElementById('viewCount');
 const uploadDate = document.getElementById('uploadDate');
 const commentsList = document.getElementById('commentsList');
 const loadMoreComments = document.getElementById('loadMoreComments');
-
-// Chapter elements
 const chaptersAccordion = document.getElementById('chaptersAccordion');
 const chaptersHeader = document.getElementById('chaptersHeader');
 const currentChapterTitle = document.getElementById('currentChapterTitle');
 const chapterToggleIcon = document.getElementById('chapterToggleIcon');
 const chaptersList = document.getElementById('chaptersList');
-
-// Custom controls elements
 const playPauseBtn = document.getElementById('playPauseBtn');
 const progressBar = document.getElementById('progressBar');
 const progress = document.getElementById('progress');
@@ -38,7 +36,8 @@ const playbackSpeedBtn = document.getElementById('playbackSpeedBtn');
 const speedOptions = document.getElementById('speedOptions');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const theaterModeBtn = document.getElementById('theaterModeBtn');
-const qualityBtn = document.getElementById('qualityBtn'); // Keep: Quality Button
+const qualityBtn = document.getElementById('qualityBtn');
+*/
 
 // Global variables / State
 let currentVideoId = null;
@@ -50,6 +49,98 @@ let videoChapters = [];
 let playerResizeObserver = null; // Add ResizeObserver state
 let keydownHandler = null; // Store the handler reference
 
+// === DEFINE GLOBAL FUNCTION EARLY ===
+window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
+  // Get player overlay elements dynamically
+  const videoPlayer = document.getElementById('videoPlayer');
+  const channelAvatar = document.getElementById('channelAvatar');
+  const uploadDate = document.getElementById('uploadDate');
+  const videoTitle = document.getElementById('videoTitle');
+  const channelName = document.getElementById('channelName');
+  const subscriberCount = document.getElementById('subscriberCount');
+  const viewCount = document.getElementById('viewCount');
+  const videoDescription = document.getElementById('videoDescription');
+  const commentsList = document.getElementById('commentsList'); // Needed for loadComments
+  const loadMoreComments = document.getElementById('loadMoreComments'); // Needed for loadComments
+
+  if (!videoPlayer) {
+    console.error('Video player element not found!');
+    return;
+  }
+
+  try {
+    showLoading();
+    currentVideoId = videoId;
+    document.body.classList.add('overflow-hidden');
+
+    // --- Get and display date from card immediately ---
+    const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
+    if (uploadedDateFromCard && uploadDate) {
+      uploadDate.textContent = uploadedDateFromCard;
+    }
+
+    // --- Get avatar from card if available ---
+    const channelAvatarElement = videoCardElement?.querySelector('img[alt*="avatar"]');
+    const channelAvatarUrlFromCard = channelAvatarElement?.src;
+    if (channelAvatar && channelAvatarUrlFromCard && (channelAvatarUrlFromCard.startsWith('http') || channelAvatarUrlFromCard.startsWith('/'))) {
+      channelAvatar.src = channelAvatarUrlFromCard;
+    } else if (channelAvatar) {
+      channelAvatar.src = '/img/default-avatar.svg'; // Fallback
+    }
+    // --- End immediate avatar display ---
+
+    // Get video details
+    const detailsResponse = await fetch(`/api/video/${videoId}`);
+    if (!detailsResponse.ok) {
+      const errorData = await detailsResponse.json();
+      throw new Error(errorData.error || `Failed to fetch video details: ${detailsResponse.status}`);
+    }
+    const videoDetails = await detailsResponse.json();
+
+    // Store chapters globally for this video
+    videoChapters = videoDetails.chapters || [];
+
+    // Update video info UI (with null checks for elements)
+    if (videoTitle) videoTitle.textContent = videoDetails.title || 'Unknown';
+    if (channelName) channelName.textContent = videoDetails.author?.name || 'Unknown';
+    if (channelName) channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#';
+
+    // Update avatar if details provide a better one
+    if (channelAvatar && videoDetails.author?.thumbnails?.[0]?.url) {
+      channelAvatar.src = videoDetails.author.thumbnails[0].url;
+    }
+
+    if (subscriberCount) subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
+    if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views';
+    if (videoDescription) videoDescription.textContent = videoDetails.description || '';
+
+    // Update upload date only if needed (with null check)
+    if (!uploadedDateFromCard && videoDetails.published && uploadDate) {
+      uploadDate.textContent = videoDetails.published;
+    }
+
+    // Load comments (passing the dynamically fetched elements)
+    await loadComments(videoId, null, commentsList, loadMoreComments);
+
+    // Show video player
+    videoPlayer.classList.remove('hidden');
+
+    // Fetch SponsorBlock data
+    fetchSponsorBlockSegments(videoId);
+
+    // Initialize YouTube player
+    initializePlayer(videoId);
+
+  } catch (error) {
+    showError(`Failed to play video: ${error.message}`);
+    console.error('Playback error:', error);
+    // Clean up if loading fails
+    closeVideoPlayer(); // Ensure player closes on error
+  } finally {
+    hideLoading();
+  }
+}
+console.log("app.js: window.loadAndDisplayVideo defined", typeof window.loadAndDisplayVideo);
 // Define colors for different segment types
 const segmentColors = {
   sponsor: 'rgba(239, 68, 68, 0.6)', // Red
@@ -65,11 +156,18 @@ const segmentColors = {
 };
 
 // Event Listeners
-searchButton.addEventListener('click', performSearch);
-searchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') performSearch();
-});
-closePlayer.addEventListener('click', closeVideoPlayer);
+// Check if elements exist before adding listeners
+if (searchButton) {
+  searchButton.addEventListener('click', performSearch);
+}
+if (searchInput) {
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') performSearch();
+  });
+}
+if (closePlayer) {
+  closePlayer.addEventListener('click', closeVideoPlayer);
+}
 
 // Initialize YouTube player
 function onYouTubeIframeAPIReady() {
@@ -77,6 +175,13 @@ function onYouTubeIframeAPIReady() {
 }
 
 function initializePlayer(videoId) {
+  // Get player container dynamically
+  const playerContainer = document.getElementById('player');
+  if (!playerContainer) {
+    console.error("Player container element (#player) not found!");
+    return;
+  }
+
   if (ytPlayer) {
     ytPlayer.destroy();
   }
@@ -87,7 +192,7 @@ function initializePlayer(videoId) {
     playerResizeObserver = null;
   }
 
-  ytPlayer = new YT.Player('player', {
+  ytPlayer = new YT.Player(playerContainer, {
     videoId: videoId,
     playerVars: {
       'playsinline': 1,
@@ -136,9 +241,7 @@ function initializePlayer(videoId) {
       }
     });
     // Observe the container div the player iframe lives in
-    if (playerContainer) {
-      playerResizeObserver.observe(playerContainer);
-    }
+    playerResizeObserver.observe(playerContainer);
   } else {
     console.warn('ResizeObserver not supported. Player resizing might be suboptimal.');
     // Fallback? Maybe call setSize initially in onPlayerReady?
@@ -149,38 +252,42 @@ function initializePlayer(videoId) {
 }
 
 function onPlayerReady(event) {
+  // Get elements dynamically
+  const playPauseBtn = document.getElementById('playPauseBtn');
+
   // Player is ready
   event.target.playVideo(); // Ensure video starts playing
   event.target.unMute(); // Unmute after autoplay starts
-  updateVolumeUI();
-  playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Update the play button to show pause
+  updateVolumeUI(); // Assumes this gets elements dynamically now
+  if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Update the play button
 
   // Attempt to display markers now that player is ready
-  displaySponsorSegments();
+  displaySponsorSegments(); // Assumes this gets elements dynamically
 
   // Display chapters if available
-  displayChapters(videoChapters); // Pass stored chapters
+  displayChapters(videoChapters); // Pass stored chapters, assumes func gets elements dynamically
 
   // Initial update of time display, progress, and current chapter
-  updatePlaybackProgress();
+  updatePlaybackProgress(); // Assumes this gets elements dynamically
 
   // Start progress timer to continuously update
   startProgressTimer();
 
   // Update volume UI
-  updateVolumeUI();
+  updateVolumeUI(); // Assumes this gets elements dynamically
 
   // Get and display initial quality
   if (ytPlayer && typeof ytPlayer.getPlaybackQuality === 'function') {
+    const qualityBtn = document.getElementById('qualityBtn'); // Get qualityBtn here
     const currentQuality = ytPlayer.getPlaybackQuality();
     console.log("Initial quality:", currentQuality);
-    updateQualityDisplay(currentQuality);
+    updateQualityDisplay(currentQuality, qualityBtn); // Pass qualityBtn
   }
 
   // Add a fallback to ensure time updates work
   // This helps with possible initialization timing issues
   setTimeout(() => {
-    updatePlaybackProgress();
+    updatePlaybackProgress(); // Assumes this gets elements dynamically
     if (!progressTimer) {
       startProgressTimer();
     }
@@ -188,34 +295,39 @@ function onPlayerReady(event) {
 }
 
 function onPlayerStateChange(event) {
+  // Get elements dynamically
+  const playPauseBtn = document.getElementById('playPauseBtn');
+  const progress = document.getElementById('progress');
+  const currentTime = document.getElementById('currentTime');
+
   // First update the play/pause button
   switch (event.data) {
     case YT.PlayerState.PLAYING:
-      playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+      if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
       // Update immediately when playing starts
-      updatePlaybackProgress();
-      updateVolumeUI();
+      updatePlaybackProgress(); // Assumes dynamic elements
+      updateVolumeUI(); // Assumes dynamic elements
       // Then start the timer
       startProgressTimer();
       break;
     case YT.PlayerState.PAUSED:
-      playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+      if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
       // Update immediately when paused
-      updatePlaybackProgress();
+      updatePlaybackProgress(); // Assumes dynamic elements
       // Then stop the timer
       stopProgressTimer();
       break;
     case YT.PlayerState.ENDED:
-      playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+      if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
       // Update immediately when ended
-      updatePlaybackProgress();
+      updatePlaybackProgress(); // Assumes dynamic elements
       // Then stop the timer
       stopProgressTimer();
       // Reset progress to 0% visually on end
-      progress.style.width = '0%';
-      currentTime.textContent = formatTime(0);
+      if (progress) progress.style.width = '0%';
+      if (currentTime) currentTime.textContent = formatTime(0);
       // Optionally reset chapter display
-      updateCurrentChapterUI(0, videoChapters);
+      updateCurrentChapterUI(0, videoChapters); // Assumes dynamic elements
       break;
     case YT.PlayerState.BUFFERING:
       // For buffering, keep the timer running if it's not already
@@ -248,61 +360,82 @@ function stopProgressTimer() {
 function setupCustomControls() {
   if (!ytPlayer) return;
 
-  // Play/Pause
-  playPauseBtn.addEventListener('click', togglePlayPause);
+  // Get elements dynamically
+  const playPauseBtn = document.getElementById('playPauseBtn');
+  const progressBar = document.getElementById('progressBar');
+  const volumeBtn = document.getElementById('volumeBtn');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const playbackSpeedBtn = document.getElementById('playbackSpeedBtn');
+  const speedOptions = document.getElementById('speedOptions');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const theaterModeBtn = document.getElementById('theaterModeBtn');
+  const chaptersHeader = document.getElementById('chaptersHeader');
 
-  // Progress bar - add both click and touch support
-  progressBar.addEventListener('click', seek);
-  progressBar.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (e.changedTouches && e.changedTouches[0]) {
-      const touchEvent = {
-        clientX: e.changedTouches[0].clientX,
-        clientY: e.changedTouches[0].clientY
-      };
-      seek(touchEvent);
-    }
-  });
+  // Play/Pause
+  if (playPauseBtn) playPauseBtn.addEventListener('click', togglePlayPause);
+
+  // Progress bar
+  if (progressBar) {
+    progressBar.addEventListener('click', seek);
+    progressBar.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (e.changedTouches && e.changedTouches[0]) {
+        const touchEvent = {
+          clientX: e.changedTouches[0].clientX,
+          clientY: e.changedTouches[0].clientY
+        };
+        seek(touchEvent); // Pass the event, seek will get progressBar again
+      }
+    });
+  }
 
   // Volume control
-  volumeBtn.addEventListener('click', toggleMute);
-  volumeSlider.addEventListener('click', updateVolume);
+  if (volumeBtn) volumeBtn.addEventListener('click', toggleMute);
+  if (volumeSlider) volumeSlider.addEventListener('click', updateVolume);
 
   // Playback speed
-  const speedItems = speedOptions.querySelectorAll('[data-speed]');
-  speedItems.forEach(item => {
-    item.addEventListener('click', () => {
-      const speed = parseFloat(item.dataset.speed);
-      ytPlayer.setPlaybackRate(speed);
-      playbackSpeedBtn.innerHTML = `${speed}x`;
-      speedOptions.classList.add('hidden');
+  if (speedOptions) {
+    const speedItems = speedOptions.querySelectorAll('[data-speed]');
+    speedItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const speed = parseFloat(item.dataset.speed);
+        if (ytPlayer) ytPlayer.setPlaybackRate(speed);
+        if (playbackSpeedBtn) playbackSpeedBtn.innerHTML = `${speed}x`;
+        speedOptions.classList.add('hidden');
+      });
     });
-  });
+  }
 
-  // Playback speed - Toggle menu visibility on button click
-  playbackSpeedBtn.addEventListener('click', (event) => {
-    event.stopPropagation(); // Prevent this click from immediately closing the menu via the document listener
-    speedOptions.classList.toggle('hidden');
-  });
+  if (playbackSpeedBtn && speedOptions) {
+    playbackSpeedBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      speedOptions.classList.toggle('hidden');
+    });
 
-  // Close speed options if clicking outside
-  document.addEventListener('click', (event) => {
-    if (!playbackSpeedBtn.contains(event.target) && !speedOptions.contains(event.target)) {
-      speedOptions.classList.add('hidden');
-    }
-  });
+    // Close speed options if clicking outside
+    document.addEventListener('click', (event) => {
+      if (!playbackSpeedBtn.contains(event.target) && !speedOptions.contains(event.target)) {
+        speedOptions.classList.add('hidden');
+      }
+    });
+  }
 
   // Fullscreen
-  fullscreenBtn.addEventListener('click', toggleFullscreen);
+  if (fullscreenBtn) fullscreenBtn.addEventListener('click', toggleFullscreen);
 
   // Theater Mode
-  theaterModeBtn.addEventListener('click', toggleTheaterMode);
+  if (theaterModeBtn) theaterModeBtn.addEventListener('click', toggleTheaterMode);
 
   // Chapters Accordion Toggle
-  chaptersHeader.addEventListener('click', toggleChaptersAccordion);
+  if (chaptersHeader) chaptersHeader.addEventListener('click', toggleChaptersAccordion);
 }
 
 function updatePlaybackProgress() {
+  // Get elements dynamically
+  const currentTime = document.getElementById('currentTime');
+  const duration = document.getElementById('duration');
+  const progress = document.getElementById('progress');
+
   if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
 
   try {
@@ -332,27 +465,25 @@ function updatePlaybackProgress() {
     // --- End SponsorBlock Skip Logic ---
 
     // Update current time display
-    currentTime.textContent = formatTime(currentVideoTime);
+    if (currentTime) currentTime.textContent = formatTime(currentVideoTime);
 
-    // Update duration display - handle live streams where duration might be 0
+    // Update duration display
     if (totalDuration > 0) {
-      duration.textContent = formatTime(totalDuration);
+      if (duration) duration.textContent = formatTime(totalDuration);
     } else {
-      // For live events or when duration is not available
-      duration.textContent = 'LIVE';
+      if (duration) duration.textContent = 'LIVE';
     }
 
     // Update progress bar width
-    if (!isNaN(currentVideoTime) && !isNaN(totalDuration) && totalDuration > 0) {
+    if (progress && !isNaN(currentVideoTime) && !isNaN(totalDuration) && totalDuration > 0) {
       const progressPercent = (currentVideoTime / totalDuration) * 100;
       progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
-    } else {
-      // For live streams, show progress at current position
+    } else if (progress) {
       progress.style.width = '100%';
     }
 
     // Update current chapter UI
-    updateCurrentChapterUI(currentVideoTime, videoChapters);
+    updateCurrentChapterUI(currentVideoTime, videoChapters); // Assumes dynamic elements
 
   } catch (error) {
     console.error('Error updating playback progress:', error);
@@ -360,21 +491,19 @@ function updatePlaybackProgress() {
 }
 
 function seek(event) {
-  if (!ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
+  // Get progressBar dynamically
+  const progressBar = document.getElementById('progressBar');
+  if (!progressBar || !ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
 
   const rect = progressBar.getBoundingClientRect();
   const pos = (event.clientX - rect.left) / rect.width;
-  const duration = ytPlayer.getDuration();
+  const durationVal = ytPlayer.getDuration(); // Use different var name
 
-  // Check if duration is valid
-  if (duration && duration > 0) {
-    const seekTime = pos * duration;
+  if (durationVal && durationVal > 0) {
+    const seekTime = pos * durationVal;
     ytPlayer.seekTo(seekTime, true);
-
-    // Force immediate UI update for better user experience
     setTimeout(() => {
-      updatePlaybackProgress();
-      // Ensure timer is running
+      updatePlaybackProgress(); // Assumes dynamic elements
       if (progressTimer === null) {
         startProgressTimer();
       }
@@ -394,6 +523,8 @@ function togglePlayPause() {
 }
 
 function toggleMute() {
+  // Get volumeBtn dynamically
+  const volumeBtn = document.getElementById('volumeBtn');
   if (!ytPlayer) return;
 
   if (ytPlayer.isMuted()) {
@@ -402,28 +533,31 @@ function toggleMute() {
     ytPlayer.mute();
   }
 
-  setTimeout(updateVolumeUI, 50);
+  setTimeout(updateVolumeUI, 50); // updateVolumeUI needs fixing
 }
 
 function updateVolume(event) {
-  if (!ytPlayer) return;
+  // Get volumeSlider dynamically
+  const volumeSlider = document.getElementById('volumeSlider');
+  if (!volumeSlider || !ytPlayer) return;
 
   const rect = volumeSlider.getBoundingClientRect();
-  // Calculate the new volume based on click position
   const volume = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
 
-  // Set the player volume
   ytPlayer.setVolume(volume * 100);
 
-  // Directly update the slider level UI
-  volumeLevel.style.width = `${volume * 100}%`;
+  // Update slider level UI dynamically
+  const volumeLevel = document.getElementById('volumeLevel');
+  if (volumeLevel) volumeLevel.style.width = `${volume * 100}%`;
 
-  // Update the icon (based on the new volume and mute state)
-  updateVolumeUI();
+  updateVolumeUI(); // Needs fixing
 }
 
 function updateVolumeUI() {
-  if (!ytPlayer) return;
+  // Get elements dynamically
+  const volumeBtn = document.getElementById('volumeBtn');
+  const volumeLevel = document.getElementById('volumeLevel');
+  if (!volumeBtn || !volumeLevel || !ytPlayer) return;
 
   const isMuted = ytPlayer.isMuted();
   const volume = ytPlayer.getVolume() / 100;
@@ -437,35 +571,37 @@ function updateVolumeUI() {
     volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
   }
 
-  // Update volume level color based on mute state
-  if (isMuted) {
-    volumeLevel.style.backgroundColor = '#ef4444'; // Tailwind red-500
-  } else {
-    volumeLevel.style.backgroundColor = '#38a169'; // Tailwind green-600 (original color)
-  }
+  // Update volume level color
+  volumeLevel.style.backgroundColor = isMuted ? '#ef4444' : '#38a169';
 }
 
 function toggleFullscreen() {
-  const playerElement = document.getElementById('player');
-  if (!playerElement) return;
+  // Get elements dynamically
+  const playerElement = document.getElementById('player'); // This is the container
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  if (!playerElement || !fullscreenBtn) return;
 
   if (document.fullscreenElement) {
     document.exitFullscreen();
     fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
   } else {
-    playerElement.requestFullscreen();
+    playerElement.requestFullscreen(); // Request fullscreen on the container
     fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
   }
 }
 
 function toggleTheaterMode() {
+  // Get elements dynamically
+  const videoPlayer = document.getElementById('videoPlayer');
+  const theaterModeBtn = document.getElementById('theaterModeBtn');
+  if (!videoPlayer || !theaterModeBtn) return;
+
   videoPlayer.classList.toggle('theater-mode');
 
-  // Update button icon based on state
   if (videoPlayer.classList.contains('theater-mode')) {
-    theaterModeBtn.innerHTML = '<i class="fas fa-compress-alt"></i>'; // Icon for exiting theater mode
+    theaterModeBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
   } else {
-    theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>'; // Original icon
+    theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>';
   }
 }
 
@@ -578,23 +714,44 @@ function createVideoCard(video) {
   return card;
 }
 
-async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
+// New Global Function to Load and Display Video Player
+// Assign to window to make it truly global
+window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
+  // Get player overlay elements dynamically
+  const videoPlayer = document.getElementById('videoPlayer');
+  const channelAvatar = document.getElementById('channelAvatar');
+  const uploadDate = document.getElementById('uploadDate');
+  const videoTitle = document.getElementById('videoTitle');
+  const channelName = document.getElementById('channelName');
+  const subscriberCount = document.getElementById('subscriberCount');
+  const viewCount = document.getElementById('viewCount');
+  const videoDescription = document.getElementById('videoDescription');
+  const commentsList = document.getElementById('commentsList'); // Needed for loadComments
+  const loadMoreComments = document.getElementById('loadMoreComments'); // Needed for loadComments
+
+  if (!videoPlayer) {
+    console.error('Video player element not found!');
+    return;
+  }
+
   try {
     showLoading();
     currentVideoId = videoId;
     document.body.classList.add('overflow-hidden');
 
     // --- Get and display date from card immediately ---
-    const uploadedDateFromCard = videoCardElement.dataset.uploadedat;
-    if (uploadedDateFromCard) {
+    const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
+    if (uploadedDateFromCard && uploadDate) {
       uploadDate.textContent = uploadedDateFromCard;
     }
 
-    // --- Set avatar immediately from card data ---
-    if (channelAvatarUrlFromCard) {
-      channelAvatar.src = channelAvatarUrlFromCard; // Use the passed URL
-    } else {
-      channelAvatar.src = '/img/default-avatar.svg'; // Fallback if not passed
+    // --- Get avatar from card if available ---
+    const channelAvatarElement = videoCardElement?.querySelector('img[alt*="avatar"]');
+    const channelAvatarUrlFromCard = channelAvatarElement?.src;
+    if (channelAvatar && channelAvatarUrlFromCard && (channelAvatarUrlFromCard.startsWith('http') || channelAvatarUrlFromCard.startsWith('/'))) {
+      channelAvatar.src = channelAvatarUrlFromCard;
+    } else if (channelAvatar) {
+      channelAvatar.src = '/img/default-avatar.svg'; // Fallback
     }
     // --- End immediate avatar display ---
 
@@ -609,24 +766,27 @@ async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
     // Store chapters globally for this video
     videoChapters = videoDetails.chapters || [];
 
-    // Update video info UI
-    videoTitle.textContent = videoDetails.title || 'Unknown';
-    // Set channel name text content directly
-    channelName.textContent = videoDetails.author?.name || 'Unknown';
-    // Set the href attribute for the channel link
-    channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#'; // Link to channel page or '#' if no ID
+    // Update video info UI (with null checks for elements)
+    if (videoTitle) videoTitle.textContent = videoDetails.title || 'Unknown';
+    if (channelName) channelName.textContent = videoDetails.author?.name || 'Unknown';
+    if (channelName) channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#';
 
-    subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
-    viewCount.textContent = videoDetails.view_count || '0 views';
-    videoDescription.textContent = videoDetails.description || '';
+    // Update avatar if details provide a better one
+    if (channelAvatar && videoDetails.author?.thumbnails?.[0]?.url) {
+      channelAvatar.src = videoDetails.author.thumbnails[0].url;
+    }
 
-    // Update upload date ONLY if not set from card (or if details are more accurate)
-    if (!uploadedDateFromCard && videoDetails.published) {
+    if (subscriberCount) subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
+    if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views';
+    if (videoDescription) videoDescription.textContent = videoDetails.description || '';
+
+    // Update upload date only if needed (with null check)
+    if (!uploadedDateFromCard && videoDetails.published && uploadDate) {
       uploadDate.textContent = videoDetails.published;
     }
 
-    // Load comments
-    await loadComments(videoId);
+    // Load comments (passing the dynamically fetched elements)
+    await loadComments(videoId, null, commentsList, loadMoreComments);
 
     // Show video player
     videoPlayer.classList.remove('hidden');
@@ -634,20 +794,31 @@ async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
     // Fetch SponsorBlock data
     fetchSponsorBlockSegments(videoId);
 
-    // Initialize YouTube player (now chapters are stored, onPlayerReady can use them)
+    // Initialize YouTube player
     initializePlayer(videoId);
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
     console.error('Playback error:', error);
     // Clean up if loading fails
-    closeVideoPlayer();
+    closeVideoPlayer(); // Ensure player closes on error
   } finally {
     hideLoading();
   }
+  console.log("app.js: window.loadAndDisplayVideo defined", typeof window.loadAndDisplayVideo);
 }
 
-async function loadComments(videoId, continuation = null) {
+// Existing function now calls the new global one
+async function playVideo(videoId, videoCardElement) {
+  window.loadAndDisplayVideo(videoId, videoCardElement);
+}
+
+async function loadComments(videoId, continuation = null, commentsList, loadMoreComments) { // Accept elements as args
+  // Check if elements were passed
+  if (!commentsList || !loadMoreComments) {
+    console.error("Comments list or load more button element not provided to loadComments");
+    return;
+  }
   try {
     const url = continuation
       ? `/api/comments/${videoId}?continuation=${continuation}`
@@ -723,13 +894,28 @@ function createCommentElement(comment) {
 }
 
 // Add event listener for load more comments button
-loadMoreComments.addEventListener('click', () => {
-  if (currentVideoId && commentsNextPage) {
-    loadComments(currentVideoId, commentsNextPage);
+// This needs to be added dynamically when the button is present
+// Maybe call this from loadAndDisplayVideo?
+function setupLoadMoreCommentsListener() {
+  const loadMoreCommentsBtn = document.getElementById('loadMoreComments');
+  const commentsListEl = document.getElementById('commentsList');
+  if (loadMoreCommentsBtn && commentsListEl) {
+    loadMoreCommentsBtn.addEventListener('click', () => {
+      if (currentVideoId && commentsNextPage) {
+        loadComments(currentVideoId, commentsNextPage, commentsListEl, loadMoreCommentsBtn);
+      }
+    });
   }
-});
+}
 
 function closeVideoPlayer() {
+  // Get elements dynamically
+  const videoPlayer = document.getElementById('videoPlayer');
+  const playerContainer = document.getElementById('player'); // Needed for observer
+  const commentsList = document.getElementById('commentsList');
+  const loadMoreComments = document.getElementById('loadMoreComments');
+  const qualityBtn = document.getElementById('qualityBtn');
+
   // Disconnect observer when closing player
   if (playerResizeObserver && playerContainer) {
     playerResizeObserver.unobserve(playerContainer);
@@ -741,16 +927,16 @@ function closeVideoPlayer() {
     ytPlayer.destroy();
     ytPlayer = null;
   }
-  videoPlayer.classList.add('hidden');
+  if (videoPlayer) videoPlayer.classList.add('hidden');
   document.body.classList.remove('overflow-hidden');
   currentVideoId = null;
   commentsNextPage = null;
-  commentsList.innerHTML = '';
-  loadMoreComments.style.display = 'none';
-  clearSponsorMarkers();
-  clearChapters(); // Clear chapters UI
-  videoChapters = []; // Clear stored chapters
-  if (qualityBtn) qualityBtn.textContent = 'Auto'; // Reset quality button
+  if (commentsList) commentsList.innerHTML = '';
+  if (loadMoreComments) loadMoreComments.style.display = 'none';
+  clearSponsorMarkers(); // Assumes this gets its element dynamically or doesn't need one
+  clearChapters(); // Assumes this gets its elements dynamically
+  videoChapters = [];
+  if (qualityBtn) qualityBtn.textContent = 'Auto';
 
   // Remove keyboard listener when closing
   document.removeEventListener('keydown', handleKeydown);
@@ -880,13 +1066,18 @@ function clearSponsorMarkers() {
 }
 
 function displayChapters(chapters) {
-  // Ensure elements exist before proceeding
-  if (!chaptersAccordion || !chaptersList || !chaptersHeader || !progressBar) { // Added progressBar check
-    console.warn("Chapter UI elements or progress bar not found. Cannot display chapters.");
+  const chaptersAccordion = document.getElementById('chaptersAccordion');
+  const chaptersList = document.getElementById('chaptersList');
+  const chaptersHeader = document.getElementById('chaptersHeader');
+  const progressBar = document.getElementById('progressBar'); // Get progress bar here
+  const chapterToggleIcon = document.getElementById('chapterToggleIcon'); // Get toggle icon
+
+  if (!chaptersAccordion || !chaptersList || !chaptersHeader || !progressBar || !chapterToggleIcon) {
+    console.warn("Chapter UI elements not found. Cannot display chapters.");
     return;
   }
 
-  clearChapters(); // Clear previous chapters and markers first
+  clearChapters(); // Assumes dynamic elements
 
   if (!chapters || chapters.length === 0 || !ytPlayer || typeof ytPlayer.getDuration !== 'function') {
     console.log("No chapters available or player not ready for this video.");
@@ -953,9 +1144,12 @@ function displayChapters(chapters) {
 }
 
 function updateCurrentChapterUI(currentTime, chapters) {
-  // Ensure elements exist
+  const chaptersList = document.getElementById('chaptersList');
+  const currentChapterTitle = document.getElementById('currentChapterTitle');
+  const chaptersAccordion = document.getElementById('chaptersAccordion');
+
   if (!chaptersList || !currentChapterTitle || !chaptersAccordion || chaptersAccordion.classList.contains('hidden')) {
-    return; // Don't update if chapters aren't displayed or elements are missing
+    return;
   }
 
   if (!chapters || chapters.length === 0) {
@@ -988,6 +1182,8 @@ function updateCurrentChapterUI(currentTime, chapters) {
 }
 
 function toggleChaptersAccordion() {
+  const chaptersList = document.getElementById('chaptersList');
+  const chapterToggleIcon = document.getElementById('chapterToggleIcon');
   if (!chaptersList || !chapterToggleIcon) return;
 
   const isHidden = chaptersList.classList.toggle('hidden');
@@ -1006,14 +1202,19 @@ function toggleChaptersAccordion() {
 }
 
 function clearChapters() {
+  const chaptersAccordion = document.getElementById('chaptersAccordion');
+  const chaptersList = document.getElementById('chaptersList');
+  const currentChapterTitle = document.getElementById('currentChapterTitle');
+  const chapterToggleIcon = document.getElementById('chapterToggleIcon');
+  const progressBar = document.getElementById('progressBar');
+
   if (chaptersAccordion) chaptersAccordion.classList.add('hidden');
-  if (chaptersList) chaptersList.innerHTML = ''; // Clear list content
-  if (currentChapterTitle) currentChapterTitle.textContent = ''; // Clear header title
-  if (chapterToggleIcon) { // Reset icon
+  if (chaptersList) chaptersList.innerHTML = '';
+  if (currentChapterTitle) currentChapterTitle.textContent = '';
+  if (chapterToggleIcon) {
     chapterToggleIcon.classList.remove('fa-chevron-up');
     chapterToggleIcon.classList.add('fa-chevron-down');
   }
-  // Also remove chapter markers from the progress bar
   if (progressBar) {
     const existingMarkers = progressBar.querySelectorAll('.chapter-marker');
     existingMarkers.forEach(marker => marker.remove());
@@ -1023,8 +1224,10 @@ function clearChapters() {
 // --- Keyboard Shortcuts ---
 
 function handleKeydown(event) {
-  // Ignore if player isn't active or if typing in an input/textarea
-  // Also ignore if speed options are open
+  const videoPlayer = document.getElementById('videoPlayer'); // Get this dynamically
+  const speedOptions = document.getElementById('speedOptions'); // And this
+  const volumeLevel = document.getElementById('volumeLevel'); // And this
+
   if (!ytPlayer || !videoPlayer || videoPlayer.classList.contains('hidden') ||
     ['INPUT', 'TEXTAREA'].includes(event.target.tagName) ||
     (speedOptions && !speedOptions.classList.contains('hidden'))) {
@@ -1107,11 +1310,12 @@ function handleKeydown(event) {
 // Keep: Handle actual quality change event from YouTube
 function onPlaybackQualityChange(event) {
   console.log("Playback quality changed to:", event.data);
-  updateQualityDisplay(event.data);
+  const qualityBtn = document.getElementById('qualityBtn'); // Get button dynamically
+  updateQualityDisplay(event.data, qualityBtn);
 }
 
 // New: Update the quality button display
-function updateQualityDisplay(quality) {
+function updateQualityDisplay(quality, qualityBtn) { // Accept button as arg
   if (!qualityBtn) return;
   // Map technical quality names to user-friendly labels
   const qualityMap = {

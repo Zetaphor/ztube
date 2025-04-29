@@ -25,16 +25,16 @@ function createVideoCard(video) {
   card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
 
-  // When clicking a video card on the channel page, we want to navigate to the video player page/view
-  // For a simple SPA-like feel without full routing, we might just redirect.
+  // When clicking a video card on the channel page, call the global loadAndDisplayVideo
   card.onclick = () => {
-    // Redirect to the main page with the video ID? Or use history API?
-    // Simplest approach for now: redirect (assumes app.js handles loading video by ID if found in URL, which it doesn't currently)
-    // A better approach would be needed for a true SPA.
-    console.log(`Navigate to video: ${video.id}`);
-    // window.location.href = `/?videoId=${video.id}`; // Example redirection
-    // Or, if app.js is loaded globally, maybe call a function from there?
-    // For now, just log it.
+    console.log(`Channel page: Requesting video play: ${video.id}`);
+    if (typeof window.loadAndDisplayVideo === 'function') {
+      window.loadAndDisplayVideo(video.id, card); // Pass the video ID and the card element
+    } else {
+      console.error('loadAndDisplayVideo function not found. Ensure app.js is loaded correctly.');
+      // Fallback or error display?
+      // Maybe redirect: window.location.href = `/?videoId=${video.id}`;
+    }
   };
 
   const channelNameText = video.channel?.name || 'Unknown';
@@ -185,6 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof channelData !== 'undefined' && channelData.id) {
     currentChannelId = channelData.id;
     console.log('Channel JS Initialized for ID:', currentChannelId);
+    console.log('Channel JS: Checking window.loadAndDisplayVideo on DOMContentLoaded:', typeof window.loadAndDisplayVideo);
 
     // Add data attributes and event listeners to tabs
     tabs.forEach(tab => {

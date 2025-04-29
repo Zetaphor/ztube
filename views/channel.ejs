@@ -87,14 +87,21 @@
 
   </main>
 
-  <!-- Link to the new channel-specific JS file -->
-  <script src="/js/channel.js"></script>
-  <script>
-    // Pass channel data to the external script
-    const channelData = JSON.parse('<%- JSON.stringify(channel || {}) %>');
-    // console.log('Channel Data (passed to channel.js):', channelData);
-    // Remove inline logic, it's now in channel.js
-  </script>
+  <%- include('partials/videoPlayer') %>
+    <!-- End Copied Video Player Structure -->
+
+    <!-- YouTube IFrame API (needed for player) -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <!-- Link to shared app logic first -->
+    <script src="/js/app.js"></script>
+    <!-- Link to the new channel-specific JS file -->
+    <script src="/js/channel.js"></script>
+    <script>
+      // Pass channel data to the external script
+      const channelData = JSON.parse('<%- JSON.stringify(channel || {}) %>');
+      // console.log('Channel Data (passed to channel.js):', channelData);
+      // Remove inline logic, it's now in channel.js
+    </script>
 
 </body>
 
