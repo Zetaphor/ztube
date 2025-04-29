@@ -186,8 +186,8 @@
 }
 
 #volumeLevel {
-  background: #38a169;
-  /* Tailwind green-600 */
+  /* background: #38a169; */
+  /* REMOVE or comment out this line */
   height: 100%;
   border-radius: 2px;
   transition: width 0.1s;

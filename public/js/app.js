@@ -326,25 +326,13 @@ function togglePlayPause() {
 function toggleMute() {
   if (!ytPlayer) return;
 
-  const currentlyMuted = ytPlayer.isMuted();
-  const currentVolume = ytPlayer.getVolume() / 100;
-
-  if (currentlyMuted) {
+  if (ytPlayer.isMuted()) {
     ytPlayer.unMute();
-    // Update icon based on the action taken (unmuting) and current volume
-    if (currentVolume === 0) { // If volume is 0, keep mute icon
-      volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-    } else if (currentVolume < 0.5) {
-      volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
-    } else {
-      volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    }
   } else {
     ytPlayer.mute();
-    // Update icon based on the action taken (muting)
-    volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
   }
-  // Removed the call to updateVolumeUI() as we handle the icon directly
+
+  setTimeout(updateVolumeUI, 50);
 }
 
 function updateVolume(event) {
@@ -370,12 +358,22 @@ function updateVolumeUI() {
   const isMuted = ytPlayer.isMuted();
   const volume = ytPlayer.getVolume() / 100;
 
+  // Update icon
   if (isMuted || volume === 0) {
     volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
   } else if (volume < 0.5) {
     volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
   } else {
     volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+  }
+
+  // Update volume level color based on mute state
+  if (isMuted) {
+    console.log("Volume UI: Muted, setting color to red"); // DEBUG
+    volumeLevel.style.backgroundColor = '#ef4444'; // Tailwind red-500
+  } else {
+    console.log("Volume UI: Unmuted, setting color to green"); // DEBUG
+    volumeLevel.style.backgroundColor = '#38a169'; // Tailwind green-600 (original color)
   }
 }
 
