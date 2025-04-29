@@ -172,19 +172,17 @@
   z-index: 1;
 }
 
+/* Keep the #volumeSlider base styles if needed, but remove positioning */
 #volumeSlider {
-  width: 80px;
+  /* width: 80px; /* Tailwind handles this now */
   height: 4px;
+  /* Or match Tailwind h-1 */
   background: rgba(82, 82, 91, 0.4);
   /* Tailwind zinc-600 with opacity */
   border-radius: 2px;
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 10px;
+  /* Removed absolute positioning properties */
   cursor: pointer;
-  z-index: 2;
+  /* z-index: 2; /* Likely not needed anymore */
 }
 
 #volumeLevel {
@@ -236,8 +234,7 @@
   margin-top: 8px;
 }
 
-/* Volume and speed controls show on hover */
-.group:hover>#volumeSlider,
+/* Keep the rule for speed options if it relies on group-hover */
 .group:hover>#speedOptions {
   display: block !important;
 }

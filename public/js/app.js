@@ -105,6 +105,7 @@ function onPlayerReady(event) {
   // Player is ready
   event.target.playVideo(); // Ensure video starts playing
   event.target.unMute(); // Unmute after autoplay starts
+  updateVolumeUI();
   playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Update the play button to show pause
 
   // Attempt to display markers now that player is ready
@@ -139,6 +140,7 @@ function onPlayerStateChange(event) {
       playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
       // Update immediately when playing starts
       updatePlaybackProgress();
+      updateVolumeUI();
       // Then start the timer
       startProgressTimer();
       break;
@@ -324,20 +326,41 @@ function togglePlayPause() {
 function toggleMute() {
   if (!ytPlayer) return;
 
-  if (ytPlayer.isMuted()) {
+  const currentlyMuted = ytPlayer.isMuted();
+  const currentVolume = ytPlayer.getVolume() / 100;
+
+  if (currentlyMuted) {
     ytPlayer.unMute();
+    // Update icon based on the action taken (unmuting) and current volume
+    if (currentVolume === 0) { // If volume is 0, keep mute icon
+      volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+    } else if (currentVolume < 0.5) {
+      volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
+    } else {
+      volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
   } else {
     ytPlayer.mute();
+    // Update icon based on the action taken (muting)
+    volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
   }
-  updateVolumeUI();
+  // Removed the call to updateVolumeUI() as we handle the icon directly
 }
 
 function updateVolume(event) {
   if (!ytPlayer) return;
 
   const rect = volumeSlider.getBoundingClientRect();
+  // Calculate the new volume based on click position
   const volume = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+
+  // Set the player volume
   ytPlayer.setVolume(volume * 100);
+
+  // Directly update the slider level UI
+  volumeLevel.style.width = `${volume * 100}%`;
+
+  // Update the icon (based on the new volume and mute state)
   updateVolumeUI();
 }
 
@@ -346,8 +369,6 @@ function updateVolumeUI() {
 
   const isMuted = ytPlayer.isMuted();
   const volume = ytPlayer.getVolume() / 100;
-
-  volumeLevel.style.width = `${volume * 100}%`;
 
   if (isMuted || volume === 0) {
     volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';

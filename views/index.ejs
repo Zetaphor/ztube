@@ -54,14 +54,13 @@
               <span id="duration" class="text-white text-sm absolute -bottom-5 right-0">0:00</span>
             </div>
             <div class="flex items-center space-x-4">
-              <div class="group relative">
+              <div class="relative">
                 <button id="volumeBtn" class="text-white hover:text-green-500">
                   <i class="fas fa-volume-up"></i>
                 </button>
-                <div id="volumeSlider"
-                  class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-24 h-1 bg-zinc-700 rounded cursor-pointer">
-                  <div id="volumeLevel" class="h-full bg-green-600 rounded" style="width: 100%"></div>
-                </div>
+              </div>
+              <div id="volumeSlider" class="w-16 h-1 bg-zinc-700 rounded cursor-pointer ml-2">
+                <div id="volumeLevel" class="h-full bg-green-600 rounded" style="width: 100%"></div>
               </div>
               <div class="group relative">
                 <button id="playbackSpeedBtn" class="text-white hover:text-green-500">
