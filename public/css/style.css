@@ -416,6 +416,7 @@
   /* Stretch items to fill height */
 }
 
+/* Change the main container to stack vertically */
 #videoPlayer.theater-mode .relative {
   /* w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4 becomes: */
   width: 100% !important;
@@ -424,59 +425,80 @@
   margin-right: 0 !important;
   height: 100%;
   display: flex;
-  flex-direction: row;
-  /* Ensure row layout */
-  gap: 1rem;
-  /* Keep the gap */
+  flex-direction: column;
+  /* Stack main content above recommendations */
+  gap: 0;
+  /* Remove gap between the two main sections */
 }
 
+/* Make main content (player + info) take full width and grow vertically */
 #videoPlayer.theater-mode #mainPlayerContent {
   /* flex-grow w-full md:w-2/3 becomes: */
+  width: 100%;
+  /* Takes full width */
   flex-grow: 1;
-  /* Take up remaining space */
-  width: auto;
-  /* Remove fixed width */
+  /* Allow it to take up most vertical space */
+  min-height: 0;
+  /* Allow shrinking */
   display: flex;
-  flex-direction: column;
-  min-width: 0;
-  /* Prevent overflow issues */
-  height: 100%;
-  /* Fill parent height */
+  flex-direction: column !important;
+  /* Stack player/controls above info/chapters/comments */
 }
 
+/* Ensure player area takes remaining space vertically, with min height */
 #videoPlayer.theater-mode #videoAreaContainer {
   /* bg-black rounded-t-lg overflow-hidden flex flex-col flex-grow becomes: */
-  flex-grow: 1;
-  /* Allow video area to grow */
+  /* flex-grow: 1; */
+  /* REMOVED */
+  /* min-height: 0; */
+  /* Replaced below */
+  min-height: 50vh;
+  /* *** ADDED: Ensure minimum player height *** */
+  /* flex-shrink: 0; */
+  /* REMOVED */
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  /* Allow shrinking */
+  border-radius: 0;
+  /* Remove rounding */
 }
 
+/* Player maintains aspect ratio within its container */
 #videoPlayer.theater-mode #player {
   /* w-full yt-player-container flex-grow becomes: */
-  aspect-ratio: auto !important;
+  aspect-ratio: 16 / 9;
+  /* Maintain aspect ratio */
+  width: 100%;
+  /* Ensure player tries to fill container */
+  /* flex-grow: 1; */
+  /* *** REMOVED: Aspect ratio controls height relative to width *** */
   min-height: 0;
-  /* Allow shrinking */
 }
 
 #videoPlayer.theater-mode #player iframe {
   width: 100% !important;
-  /* Let setSize handle height */
-  min-width: 100% !important;
-  /* Let setSize handle height */
+  height: 100% !important;
+  /* Let the container aspect ratio control size */
 }
 
+/* Info section below player, limited height, scrollable */
 #videoPlayer.theater-mode #videoInfo {
-  /* Adjustments for theater mode within the main column */
-  max-height: 40vh;
-  /* Keep height limit */
-  overflow-y: auto;
-  border-radius: 0 0 0.5rem 0.5rem;
-  /* Keep bottom rounding */
+  /* Adjustments for theater mode: info/comments below player */
+  width: 100%;
+  /* Take full width below player */
   flex-shrink: 0;
-  /* Don't shrink info/comments area */
+  max-height: 40vh;
+  /* Limit max height for info section */
+  min-height: 0;
+  /* Allow shrinking */
+  overflow-y: auto;
+  border-radius: 0;
+  /* Remove rounding */
+  background-color: #27272a;
+  /* Ensure consistent background (zinc-800) */
+  padding: 1rem;
+  /* Add some padding */
+  border-top: 1px solid #3f3f46;
+  /* Add a subtle separator (zinc-700) */
 }
 
 #videoPlayer.theater-mode #commentsList {
@@ -484,16 +506,28 @@
   /* Remove fixed height inside scrollable parent */
 }
 
+/* Recommendations section at the bottom, no min height */
 #videoPlayer.theater-mode #recommendedVideos {
   /* w-full md:w-1/3 bg-zinc-800 rounded-lg p-4 flex-shrink-0 max-h-[80vh] overflow-y-auto becomes: */
-  width: 350px;
-  /* Fixed width for sidebar */
-  flex-shrink: 0;
-  height: 100%;
-  /* Fill parent height */
-  max-height: none;
-  /* Remove max-height */
+  width: 100%;
+  /* Takes full width */
+  max-height: 30vh;
+  /* Limit height (e.g., 30% of viewport) */
+  flex-shrink: 1;
+  /* Allow shrinking if space is tight */
+  /* min-height: 0; */
+  /* *** REMOVED/ENSURED ABSENT *** */
   overflow-y: auto;
+  background-color: #1f1f22;
+  /* Slightly different bg */
+  padding: 1rem;
+  border-top: 1px solid #3f3f46;
+  /* Separator */
+  border-radius: 0;
+  /* Remove rounding */
+  /* Explicitly remove potentially conflicting properties */
+  height: auto;
+  /* Override any fixed height */
 }
 
 #videoPlayer.theater-mode .volume-icon {
