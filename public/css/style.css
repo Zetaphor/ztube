@@ -1,3 +1,15 @@
+#closePlayer {
+  width: 32px;
+  height: 32px;
+  background: #10b981;
+  border-radius: 50px;
+  color: #000;
+}
+
+#closePlayer:hover {
+  color: #fff;
+}
+
 /* Custom styles */
 .video-card {
   transition: transform 0.2s;
