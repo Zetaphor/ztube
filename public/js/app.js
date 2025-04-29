@@ -28,10 +28,26 @@ const playbackSpeedBtn = document.getElementById('playbackSpeedBtn');
 const speedOptions = document.getElementById('speedOptions');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 
+// Global variables / State
 let currentVideoId = null;
 let commentsNextPage = null;
 let ytPlayer = null;
 let progressTimer = null;
+let sponsorSegments = [];
+
+// Define colors for different segment types
+const segmentColors = {
+  sponsor: 'rgba(239, 68, 68, 0.6)', // Red
+  selfpromo: 'rgba(34, 197, 94, 0.6)', // Green
+  interaction: 'rgba(59, 130, 246, 0.6)', // Blue
+  intro: 'rgba(168, 85, 247, 0.6)', // Purple
+  outro: 'rgba(168, 85, 247, 0.6)', // Purple (same as intro)
+  preview: 'rgba(245, 158, 11, 0.6)', // Amber
+  music_offtopic: 'rgba(234, 179, 8, 0.6)', // Yellow
+  poi_highlight: 'rgba(234, 179, 8, 0.6)', // Yellow (Same as music_offtopic now)
+  filler: 'rgba(107, 114, 128, 0.5)', // Gray
+  // Add other categories if needed
+};
 
 // Event Listeners
 searchButton.addEventListener('click', performSearch);
@@ -90,6 +106,9 @@ function onPlayerReady(event) {
   event.target.unMute(); // Unmute after autoplay starts
   playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Update the play button to show pause
 
+  // Attempt to display markers now that player is ready
+  displaySponsorSegments();
+
   // Initial update of time display and progress
   updatePlaybackProgress();
 
@@ -132,6 +151,9 @@ function onPlayerStateChange(event) {
       updatePlaybackProgress();
       // Then stop the timer
       stopProgressTimer();
+      // Reset progress to 0% visually on end
+      progress.style.width = '0%';
+      currentTime.textContent = formatTime(0);
       break;
     case YT.PlayerState.BUFFERING:
       // For buffering, keep the timer running if it's not already
@@ -205,6 +227,28 @@ function updatePlaybackProgress() {
   try {
     const currentVideoTime = ytPlayer.getCurrentTime() || 0;
     const totalDuration = ytPlayer.getDuration() || 0;
+
+    // --- SponsorBlock Skip Logic ---
+    if (sponsorSegments && sponsorSegments.length > 0 && totalDuration > 0) {
+      const sponsorCategory = 'sponsor'; // Category to skip
+      for (const segment of sponsorSegments) {
+        if (segment.category === sponsorCategory) {
+          const startTime = segment.segment[0];
+          const endTime = segment.segment[1];
+          // Check if current time is within a sponsor segment (add a small buffer to prevent loops)
+          if (currentVideoTime >= startTime && currentVideoTime < endTime - 0.1) {
+            console.log(`SponsorBlock: Skipping segment from ${formatTime(startTime)} to ${formatTime(endTime)}`);
+            ytPlayer.seekTo(endTime, true);
+            // Update UI immediately after skipping
+            currentTime.textContent = formatTime(endTime);
+            const progressPercent = (endTime / totalDuration) * 100;
+            progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
+            return; // Exit early after skipping
+          }
+        }
+      }
+    }
+    // --- End SponsorBlock Skip Logic ---
 
     // Update current time display
     currentTime.textContent = formatTime(currentVideoTime);
@@ -433,6 +477,9 @@ async function playVideo(videoId) {
     // Show video player
     videoPlayer.classList.remove('hidden');
 
+    // Fetch SponsorBlock data
+    fetchSponsorBlockSegments(videoId);
+
     // Initialize YouTube player
     initializePlayer(videoId);
 
@@ -471,6 +518,9 @@ async function loadComments(videoId, continuation = null) {
     // Update next page token and show/hide load more button
     commentsNextPage = data.continuation;
     loadMoreComments.style.display = data.continuation ? 'block' : 'none';
+
+    sponsorSegments = []; // Clear segments
+    clearSponsorMarkers(); // Clear visual markers
   } catch (error) {
     console.error('Failed to load comments:', error);
     commentsList.innerHTML = '<div class="text-center py-4 text-gray-500">Failed to load comments</div>';
@@ -590,3 +640,71 @@ function onPlayerError(event) {
   console.error('YouTube player error:', event.data);
   showError('Video playback error. Please try again.');
 }
+
+// --- SponsorBlock Fetch Function ---
+
+async function fetchSponsorBlockSegments(videoId) {
+  try {
+    // Request more categories
+    const categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "filler"];
+    const apiUrl = `https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=${JSON.stringify(categories)}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      // Don't throw an error, just log it. SB might not have data.
+      console.log(`SponsorBlock: No segments found or API error for ${videoId} (${response.status})`);
+      sponsorSegments = [];
+      clearSponsorMarkers(); // Clear any old markers
+      return;
+    }
+    sponsorSegments = await response.json();
+    console.log(`SponsorBlock: Found ${sponsorSegments.length} segments for ${videoId}`);
+    displaySponsorSegments(); // Display markers after fetching
+  } catch (error) {
+    console.error('SponsorBlock: Failed to fetch segments:', error);
+    sponsorSegments = [];
+    clearSponsorMarkers();
+  }
+}
+
+// --- SponsorBlock Display Function ---
+function displaySponsorSegments() {
+  clearSponsorMarkers(); // Clear existing markers first
+  const markerContainer = document.getElementById('segmentMarkers');
+  if (!markerContainer || !sponsorSegments || sponsorSegments.length === 0) {
+    return;
+  }
+
+  sponsorSegments.forEach(segment => {
+    // Get duration inside the loop to ensure player is ready
+    if (!ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
+    const duration = ytPlayer.getDuration();
+    if (!duration || duration <= 0) return; // Skip if duration unknown
+
+    const category = segment.category;
+    const startTime = segment.segment[0];
+    const endTime = segment.segment[1];
+    const color = segmentColors[category] || 'rgba(156, 163, 175, 0.5)'; // Default gray
+    const title = `${category.replace('_', ' ')}: ${formatTime(startTime)}` + (category !== 'poi_highlight' ? ` - ${formatTime(endTime)}` : '');
+
+    // Ensure valid times before proceeding
+    if (startTime >= 0 && endTime >= startTime && duration > 0) {
+      const marker = document.createElement('div');
+      marker.className = 'segment-marker';
+      marker.style.backgroundColor = color;
+      marker.title = title;
+
+      // Standard block for all segments
+      marker.style.left = `${(startTime / duration) * 100}%`;
+      marker.style.width = `${Math.max(0.1, ((endTime - startTime) / duration) * 100)}%`; // Ensure minimum visible width
+      markerContainer.appendChild(marker);
+    }
+  });
+}
+
+function clearSponsorMarkers() {
+  const markerContainer = document.getElementById('segmentMarkers');
+  if (markerContainer) {
+    markerContainer.innerHTML = ''; // Remove all child elements
+  }
+}
+// --- End SponsorBlock Functions ---
