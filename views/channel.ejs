@@ -87,57 +87,13 @@
 
   </main>
 
-  <!-- Link to a potential channel-specific JS file -->
-  <!-- <script src="/js/channel.js"></script> -->
+  <!-- Link to the new channel-specific JS file -->
+  <script src="/js/channel.js"></script>
   <script>
-    // Basic inline script to log channel data (for now)
-    const channelData = JSON.parse('<%- JSON.stringify(channel || {}) %>'); // Parse the stringified JSON
-    console.log('Channel Data:', channelData);
-
-    // TODO: Implement fetching and displaying channel content (videos, playlists)
-    //       based on the active tab.
-    // Example: fetch(`/api/channel/${channelData.id}/videos`).then(...)
-
-    document.addEventListener('DOMContentLoaded', () => {
-      // Placeholder: You would add logic here to fetch and display content
-      console.log('Channel page loaded for:', channelData.name);
-
-      // Example of how you might fetch videos initially
-      // if (channelData.id) {
-      //   fetchChannelContent(channelData.id, 'videos');
-      // }
-    });
-
-    // async function fetchChannelContent(channelId, contentType) {
-    //   const contentArea = document.getElementById('channelContent');
-    //   contentArea.innerHTML = '<p class="col-span-full text-center text-zinc-500 py-8">Loading content...</p>';
-    //   try {
-    //     // Replace with your actual API endpoint for channel content
-    //     // const response = await fetch(`/api/channel/${channelId}/${contentType}`);
-    //     // const data = await response.json();
-
-    //     // --- MOCK DATA FOR NOW ---
-    //     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-    //     const data = { items: [] }; // Replace with actual data structure
-    //     // --- END MOCK DATA ---
-
-    //     contentArea.innerHTML = ''; // Clear loading indicator
-
-    //     if (data.items && data.items.length > 0) {
-    //       data.items.forEach(item => {
-    //         // Adapt your createVideoCard or create similar card functions
-    //         // const card = createVideoCard(item);
-    //         // contentArea.appendChild(card);
-    //       });
-    //     } else {
-    //       contentArea.innerHTML = `<p class="col-span-full text-center text-zinc-500 py-8">No ${contentType} found.</p>`;
-    //     }
-    //   } catch (error) {
-    //     console.error(`Error fetching ${contentType}:`, error);
-    //     contentArea.innerHTML = `<p class="col-span-full text-center text-red-500 py-8">Failed to load ${contentType}.</p>`;
-    //   }
-    // }
-
+    // Pass channel data to the external script
+    const channelData = JSON.parse('<%- JSON.stringify(channel || {}) %>');
+    // console.log('Channel Data (passed to channel.js):', channelData);
+    // Remove inline logic, it's now in channel.js
   </script>
 
 </body>

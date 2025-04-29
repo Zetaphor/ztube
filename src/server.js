@@ -343,6 +343,70 @@ app.get('/channel/:id', async (req, res) => {
   }
 });
 
+// API: Get Channel Videos (with basic pagination)
+app.get('/api/channel/:id/videos', async (req, res) => {
+  const { id } = req.params;
+  const { continuation } = req.query;
+
+  try {
+    let channelVideosResponse;
+    if (continuation) {
+      // If we have a continuation token, use it to get the next batch
+      // Note: youtubei.js might handle continuations differently depending on context.
+      // This assumes getting the full channel object again and then applying continuation,
+      // which might not be the most efficient way. A more direct continuation fetch might exist.
+      console.log(`Fetching continuation for channel ${id}`);
+      // Re-fetch channel to potentially get continuation context if needed
+      const channel = await youtube.getChannel(id);
+      // You might need a more specific method if getVideos() doesn't accept continuation directly
+      // For now, we assume getContinuation applies to the current state of the object
+      // This part might need adjustment based on youtubei.js specifics for channel continuations.
+      channelVideosResponse = await channel.getContinuation();
+      // TODO: Verify the structure of continuation response and adapt mapping
+
+    } else {
+      // Initial load: Get the channel and its first batch of videos
+      console.log(`Fetching initial videos for channel ${id}`);
+      const channel = await youtube.getChannel(id);
+      // Attempt to switch to the videos tab explicitly if possible/needed
+      // This depends on whether getChannel lands on the featured tab or videos tab by default
+      // channel = await channel.getVideos(); // Might be needed if getChannel doesn't default to videos
+      channelVideosResponse = await channel.getVideos(); // Fetch videos from the current channel state
+    }
+
+    // Map the video data (adapt structure as needed based on actual response)
+    // This assumes the response has a `videos` array similar to search results
+    // or continuation data includes items.
+    const videos = (channelVideosResponse.videos || channelVideosResponse.items || []).map(video => ({
+      id: video.id,
+      title: video.title?.text || video.title,
+      duration: video.duration?.text || '0:00',
+      viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+      uploadedAt: video.published?.text || 'Unknown date',
+      thumbnails: video.thumbnails || [],
+      channel: { // Include channel info for consistency, even if redundant here
+        id: id,
+        name: video.author?.name || 'Unknown',
+        avatar: video.author?.thumbnails || [],
+        verified: video.author?.is_verified || false
+      }
+    })).filter(Boolean); // Filter out any null/undefined entries
+
+    // Find the continuation token for the next page
+    // The path to the continuation token might vary based on the response structure
+    const nextContinuation = channelVideosResponse.continuation || channelVideosResponse.continuation_contents?.continuation || null;
+
+    res.json({
+      videos: videos,
+      continuation: nextContinuation
+    });
+
+  } catch (error) {
+    console.error(`Error fetching videos for channel ${id}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve channel videos' });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
