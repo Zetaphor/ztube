@@ -162,7 +162,7 @@
   left: 0;
   height: 100%;
   position: relative;
-  background: #38a169;
+  background: #2c7d52;
   /* Tailwind green-600 */
   transition: width 0.1s linear;
   z-index: 1;
@@ -239,12 +239,16 @@
   height: 100%;
   pointer-events: none;
   /* Markers should not interfere with clicks */
+  z-index: 1;
+  /* Place below chapter markers but above base bar */
 }
 
 .segment-marker {
   position: absolute;
   height: 100%;
   top: 0;
+  z-index: 1;
+  /* Ensure segment is within its container's layer */
 }
 
 /* Chapters Accordion */
@@ -386,3 +390,20 @@
 }
 
 /* End Quality Control Styles */
+
+/* Chapter Markers on Progress Bar */
+.chapter-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: rgba(255, 255, 255, 0.7);
+  /* Semi-transparent white */
+  pointer-events: none;
+  /* Don't interfere with seeking */
+  z-index: 2;
+  /* Make sure it's above the base bar but below the progress indicator */
+  border-radius: 1px;
+  transform: translateX(-50%);
+  /* Center the marker on the percentage */
+}

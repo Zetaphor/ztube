@@ -879,15 +879,22 @@ function clearSponsorMarkers() {
 
 function displayChapters(chapters) {
   // Ensure elements exist before proceeding
-  if (!chaptersAccordion || !chaptersList || !chaptersHeader) {
-    console.warn("Chapter UI elements not found. Cannot display chapters.");
+  if (!chaptersAccordion || !chaptersList || !chaptersHeader || !progressBar) { // Added progressBar check
+    console.warn("Chapter UI elements or progress bar not found. Cannot display chapters.");
     return;
   }
 
-  clearChapters(); // Clear previous chapters first
+  clearChapters(); // Clear previous chapters and markers first
 
-  if (!chapters || chapters.length === 0) {
-    console.log("No chapters available for this video.");
+  if (!chapters || chapters.length === 0 || !ytPlayer || typeof ytPlayer.getDuration !== 'function') {
+    console.log("No chapters available or player not ready for this video.");
+    chaptersAccordion.classList.add('hidden');
+    return;
+  }
+
+  const duration = ytPlayer.getDuration();
+  if (!duration || duration <= 0) {
+    console.warn("Cannot display chapter markers, invalid video duration:", duration);
     chaptersAccordion.classList.add('hidden');
     return;
   }
@@ -899,11 +906,14 @@ function displayChapters(chapters) {
   const sortedChapters = chapters.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
 
   sortedChapters.forEach((chapter, index) => {
+    const startTime = chapter.startTimeSeconds;
+
+    // --- Create Chapter List Item ---
     const chapterItem = document.createElement('div');
     chapterItem.className = 'chapter-item flex items-center justify-between p-2 cursor-pointer hover:bg-zinc-700';
-    chapterItem.dataset.startTime = chapter.startTimeSeconds;
+    chapterItem.dataset.startTime = startTime;
 
-    const timeStr = formatTime(chapter.startTimeSeconds);
+    const timeStr = formatTime(startTime);
     chapterItem.innerHTML = `
       <div class="flex items-center">
         <span class="chapter-time text-xs text-zinc-400 mr-2">${timeStr}</span>
@@ -914,15 +924,24 @@ function displayChapters(chapters) {
 
     chapterItem.addEventListener('click', () => {
       if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
-        ytPlayer.seekTo(chapter.startTimeSeconds, true);
-        // Optional: Close accordion after clicking a chapter
-        // chaptersList.classList.add('hidden');
-        // chapterToggleIcon.classList.remove('fa-chevron-up');
-        // chapterToggleIcon.classList.add('fa-chevron-down');
+        ytPlayer.seekTo(startTime, true);
       }
     });
-
     chaptersList.appendChild(chapterItem);
+    // --- End Chapter List Item ---
+
+    // --- Create Chapter Marker on Progress Bar ---
+    // Skip marker for the very first chapter (start time 0)
+    if (startTime > 0) {
+      const marker = document.createElement('div');
+      marker.className = 'chapter-marker'; // Add class for styling and clearing
+      const startPercent = (startTime / duration) * 100;
+      marker.style.left = `${startPercent}%`;
+      marker.title = `Chapter: ${chapter.title || `Chapter ${index + 1}`} (${timeStr})`; // Add tooltip
+      // Append directly to progressBar, but behind the progress indicator
+      progressBar.appendChild(marker);
+    }
+    // --- End Chapter Marker ---
   });
 
   // Initially hide the list and set the icon
@@ -991,6 +1010,11 @@ function clearChapters() {
   if (chapterToggleIcon) { // Reset icon
     chapterToggleIcon.classList.remove('fa-chevron-up');
     chapterToggleIcon.classList.add('fa-chevron-down');
+  }
+  // Also remove chapter markers from the progress bar
+  if (progressBar) {
+    const existingMarkers = progressBar.querySelectorAll('.chapter-marker');
+    existingMarkers.forEach(marker => marker.remove());
   }
 }
 
