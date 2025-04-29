@@ -154,6 +154,7 @@
   background: rgba(82, 82, 91, 0.3);
   /* Tailwind zinc-600 with opacity */
   cursor: pointer;
+  width: 100%;
 }
 
 #progress {
@@ -443,8 +444,6 @@
 
 #videoPlayer.theater-mode #player {
   /* w-full yt-player-container flex-grow becomes: */
-  flex-grow: 1;
-  /* Player takes available vertical space */
   aspect-ratio: auto !important;
   min-height: 0;
   /* Allow shrinking */
