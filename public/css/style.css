@@ -373,3 +373,16 @@
   gap: 0 !important;
   margin-left: 10px !important;
 }
+
+#videoPlayer.theater-mode .quality-controls {
+  max-width: 50px !important;
+}
+
+/* Add styles for Quality Controls */
+#qualityBtn {
+  min-width: 50px;
+  /* Ensure button has minimum width */
+  padding: 4px 8px;
+}
+
+/* End Quality Control Styles */

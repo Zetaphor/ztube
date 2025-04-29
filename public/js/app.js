@@ -38,6 +38,7 @@ const playbackSpeedBtn = document.getElementById('playbackSpeedBtn');
 const speedOptions = document.getElementById('speedOptions');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const theaterModeBtn = document.getElementById('theaterModeBtn');
+const qualityBtn = document.getElementById('qualityBtn'); // Keep: Quality Button
 
 // Global variables / State
 let currentVideoId = null;
@@ -102,12 +103,17 @@ function initializePlayer(videoId) {
       'enablejsapi': 1, // Enable JS API
       'origin': window.location.origin, // Set origin for security
       'widget_referrer': window.location.href, // Set referrer
-      'autohide': 1 // Hide YouTube controls
+      'autohide': 1, // Hide YouTube controls
+      'onReady': onPlayerReady,
+      'onStateChange': onPlayerStateChange,
+      'onError': onPlayerError,
+      'onPlaybackQualityChange': onPlaybackQualityChange // New: Add quality change listener
     },
     events: {
       'onReady': onPlayerReady,
       'onStateChange': onPlayerStateChange,
-      'onError': onPlayerError
+      'onError': onPlayerError,
+      'onPlaybackQualityChange': onPlaybackQualityChange // New: Add quality change listener
     }
   });
 
@@ -164,6 +170,13 @@ function onPlayerReady(event) {
 
   // Update volume UI
   updateVolumeUI();
+
+  // Get and display initial quality
+  if (ytPlayer && typeof ytPlayer.getPlaybackQuality === 'function') {
+    const currentQuality = ytPlayer.getPlaybackQuality();
+    console.log("Initial quality:", currentQuality);
+    updateQualityDisplay(currentQuality);
+  }
 
   // Add a fallback to ensure time updates work
   // This helps with possible initialization timing issues
@@ -735,6 +748,7 @@ function closeVideoPlayer() {
   clearSponsorMarkers();
   clearChapters(); // Clear chapters UI
   videoChapters = []; // Clear stored chapters
+  if (qualityBtn) qualityBtn.textContent = 'Auto'; // Reset quality button
 
   // Remove keyboard listener when closing
   document.removeEventListener('keydown', handleKeydown);
@@ -984,7 +998,10 @@ function clearChapters() {
 
 function handleKeydown(event) {
   // Ignore if player isn't active or if typing in an input/textarea
-  if (!ytPlayer || !videoPlayer || videoPlayer.classList.contains('hidden') || ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+  // Also ignore if speed options are open
+  if (!ytPlayer || !videoPlayer || videoPlayer.classList.contains('hidden') ||
+    ['INPUT', 'TEXTAREA'].includes(event.target.tagName) ||
+    (speedOptions && !speedOptions.classList.contains('hidden'))) {
     return;
   }
 
@@ -1059,4 +1076,29 @@ function handleKeydown(event) {
   if (preventDefault) {
     event.preventDefault();
   }
+}
+
+// Keep: Handle actual quality change event from YouTube
+function onPlaybackQualityChange(event) {
+  console.log("Playback quality changed to:", event.data);
+  updateQualityDisplay(event.data);
+}
+
+// New: Update the quality button display
+function updateQualityDisplay(quality) {
+  if (!qualityBtn) return;
+  // Map technical quality names to user-friendly labels
+  const qualityMap = {
+    'hd2160': '4K',
+    'hd1440': '1440p',
+    'hd1080': '1080p',
+    'hd720': '720p',
+    'large': '480p',
+    'medium': '360p',
+    'small': '240p',
+    'tiny': '144p',
+    'auto': 'Auto', // Keep 'auto' as is
+    // Add others if necessary based on API response
+  };
+  qualityBtn.textContent = qualityMap[quality] || quality; // Fallback to raw quality name
 }
