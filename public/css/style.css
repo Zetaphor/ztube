@@ -234,11 +234,6 @@
   margin-top: 8px;
 }
 
-/* Keep the rule for speed options if it relies on group-hover */
-.group:hover>#speedOptions {
-  display: block !important;
-}
-
 /* SponsorBlock segment markers */
 #segmentMarkers {
   position: absolute;

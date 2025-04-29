@@ -225,6 +225,19 @@ function setupCustomControls() {
     });
   });
 
+  // Playback speed - Toggle menu visibility on button click
+  playbackSpeedBtn.addEventListener('click', (event) => {
+    event.stopPropagation(); // Prevent this click from immediately closing the menu via the document listener
+    speedOptions.classList.toggle('hidden');
+  });
+
+  // Close speed options if clicking outside
+  document.addEventListener('click', (event) => {
+    if (!playbackSpeedBtn.contains(event.target) && !speedOptions.contains(event.target)) {
+      speedOptions.classList.add('hidden');
+    }
+  });
+
   // Fullscreen
   fullscreenBtn.addEventListener('click', toggleFullscreen);
 
