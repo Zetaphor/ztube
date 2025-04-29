@@ -86,7 +86,19 @@
             </div>
           </div>
         </div>
-        <div id="videoInfo" class="bg-zinc-800 p-6 rounded-b-lg">
+        <!-- Chapters Accordion -->
+        <div id="chaptersAccordion" class="hidden bg-zinc-800"> <!-- Hidden initially, removed mt-6 -->
+          <div id="chaptersHeader" class="cursor-pointer bg-zinc-700 p-3 flex justify-between items-center">
+            <i class="fas fa-list-ol text-md"></i>
+            <span id="currentChapterTitle" class="text-lg text-zinc-300 mr-2"></span>
+            <i id="chapterToggleIcon" class="fas fa-chevron-down"></i>
+          </div>
+          <div id="chaptersList" class="hidden bg-zinc-750 max-h-60 overflow-y-auto">
+            <!-- Chapter items will be added here by JS -->
+          </div>
+        </div>
+        <!-- End Chapters Accordion -->
+        <div id="videoInfo" class="bg-zinc-800 p-6 rounded-b-lg mt-0 border-t border-zinc-700">
           <div class="flex justify-between items-center mb-4">
             <h2 id="videoTitle" class="text-xl font-bold flex-1 text-zinc-100"></h2>
           </div>

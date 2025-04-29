@@ -65,13 +65,58 @@ app.get('/api/video/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const video = await youtube.getInfo(id);
-    console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
+    // Keep this log uncommented for now, it's very helpful for debugging structure issues
+    // console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
 
-    // Debug logging
-    console.log('Raw video info:', video.basic_info);
-    console.log('Channel info:', video.basic_info.channel);
+    let chapters = [];
+    let markersMap = null;
 
-    // Transform the response to include all necessary information
+    try {
+      console.log('Attempting to extract chapters...');
+
+      const decoratedPlayerBar = video.player_overlays?.decorated_player_bar;
+      const playerBar = decoratedPlayerBar?.player_bar;
+      markersMap = playerBar?.markers_map;
+
+      // --- Process the found markersMap ---
+      if (markersMap && Array.isArray(markersMap)) {
+        console.log(`Found markersMap with ${markersMap.length} items.`);
+        // Find the marker group with the key "DESCRIPTION_CHAPTERS"
+        const chapterMarkerGroup = markersMap.find(group => group.marker_key === 'DESCRIPTION_CHAPTERS');
+
+        if (chapterMarkerGroup && chapterMarkerGroup.value?.chapters && Array.isArray(chapterMarkerGroup.value.chapters)) {
+          const chapterList = chapterMarkerGroup.value.chapters;
+          console.log(`Found chapters list with ${chapterList.length} chapters.`);
+          chapters = chapterList
+            .map((chapter, index) => {
+              // Extract title using the correct path: chapter.title.text
+              const title = chapter.title?.text;
+              // Extract startTimeMs directly from chapter object
+              const startTimeMs = chapter.time_range_start_millis;
+
+              if (typeof title !== 'string' || typeof startTimeMs !== 'number') {
+                console.warn(`Invalid data in chapter at index ${index}: title=${title}, startTimeMs=${startTimeMs}`);
+                return null;
+              }
+
+              return {
+                title: title || `Chapter ${index + 1}`,
+                startTimeSeconds: startTimeMs / 1000,
+              };
+            })
+            .filter(chapter => chapter !== null)
+            .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
+          console.log(`Successfully extracted ${chapters.length} chapters.`);
+        } else {
+          console.log('Could not find marker group with key "DESCRIPTION_CHAPTERS" or it lacks a valid "value.chapters" array.');
+        }
+      } else {
+        console.log('Could not find a valid markersMap array at player_overlays.decorated_player_bar.player_bar.markers_map.');
+      }
+    } catch (e) {
+      console.error("Error during chapter extraction:", e);
+    }
+
     const videoDetails = {
       id: video.basic_info.id,
       title: video.basic_info.title?.text || video.basic_info.title,
@@ -80,8 +125,6 @@ app.get('/api/video/:id', async (req, res) => {
         ? formatViewCount(video.basic_info.view_count)
         : video.basic_info.view_count?.text || '0 views',
       like_count: video.basic_info.like_count?.text || video.basic_info.like_count,
-
-      // Revert to using the relative date text from basic_info, which works in search
       published: video.basic_info.published?.text || 'Unknown date',
       author: {
         id: video.basic_info.channel?.id,
@@ -94,11 +137,10 @@ app.get('/api/video/:id', async (req, res) => {
       },
       thumbnails: video.basic_info.thumbnails || [],
       duration: video.basic_info.duration?.text || formatDuration(video.basic_info.duration),
-      is_live: video.basic_info.is_live
+      durationSeconds: video.basic_info.duration || 0,
+      is_live: video.basic_info.is_live,
+      chapters: chapters
     };
-
-    // Debug logging
-    console.log('Transformed video details:', videoDetails);
 
     res.json(videoDetails);
   } catch (error) {
@@ -183,7 +225,7 @@ app.get('/api/comments/:id', async (req, res) => {
     });
 
     // Debug logging
-    console.log('Extracted comments:', extractedComments);
+    // console.log('Extracted comments:', extractedComments);
 
     res.json({
       comments: extractedComments,

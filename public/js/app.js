@@ -34,6 +34,7 @@ let commentsNextPage = null;
 let ytPlayer = null;
 let progressTimer = null;
 let sponsorSegments = [];
+let videoChapters = [];
 
 // Define colors for different segment types
 const segmentColors = {
@@ -109,7 +110,10 @@ function onPlayerReady(event) {
   // Attempt to display markers now that player is ready
   displaySponsorSegments();
 
-  // Initial update of time display and progress
+  // Display chapters if available
+  displayChapters(videoChapters); // Pass stored chapters
+
+  // Initial update of time display, progress, and current chapter
   updatePlaybackProgress();
 
   // Start progress timer to continuously update
@@ -154,6 +158,8 @@ function onPlayerStateChange(event) {
       // Reset progress to 0% visually on end
       progress.style.width = '0%';
       currentTime.textContent = formatTime(0);
+      // Optionally reset chapter display
+      updateCurrentChapterUI(0, videoChapters);
       break;
     case YT.PlayerState.BUFFERING:
       // For buffering, keep the timer running if it's not already
@@ -219,6 +225,9 @@ function setupCustomControls() {
 
   // Fullscreen
   fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+  // Chapters Accordion Toggle
+  chaptersHeader.addEventListener('click', toggleChaptersAccordion);
 }
 
 function updatePlaybackProgress() {
@@ -269,6 +278,10 @@ function updatePlaybackProgress() {
       // For live streams, show progress at current position
       progress.style.width = '100%';
     }
+
+    // Update current chapter UI
+    updateCurrentChapterUI(currentVideoTime, videoChapters);
+
   } catch (error) {
     console.error('Error updating playback progress:', error);
   }
@@ -450,12 +463,19 @@ async function playVideo(videoId, uploadedAt) {
   try {
     showLoading();
     currentVideoId = videoId;
-    document.body.classList.add('overflow-hidden'); // Prevent body scroll
+    document.body.classList.add('overflow-hidden');
 
     // Get video details
     const detailsResponse = await fetch(`/api/video/${videoId}`);
+    if (!detailsResponse.ok) {
+      const errorData = await detailsResponse.json();
+      throw new Error(errorData.error || `Failed to fetch video details: ${detailsResponse.status}`);
+    }
     const videoDetails = await detailsResponse.json();
-    console.log('Video Details:', videoDetails);
+    console.log('Video Details with Chapters:', videoDetails);
+
+    // Store chapters globally for this video
+    videoChapters = videoDetails.chapters || [];
 
     // Update video info UI
     videoTitle.textContent = videoDetails.title || 'Unknown';
@@ -470,7 +490,7 @@ async function playVideo(videoId, uploadedAt) {
 
     subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     viewCount.textContent = videoDetails.view_count || '0 views';
-    uploadDate.textContent = uploadedAt || 'Unknown date';
+    uploadDate.textContent = videoDetails.published || 'Unknown date';
     videoDescription.textContent = videoDetails.description || '';
 
     // Load comments
@@ -482,12 +502,14 @@ async function playVideo(videoId, uploadedAt) {
     // Fetch SponsorBlock data
     fetchSponsorBlockSegments(videoId);
 
-    // Initialize YouTube player
+    // Initialize YouTube player (now chapters are stored, onPlayerReady can use them)
     initializePlayer(videoId);
 
   } catch (error) {
-    showError('Failed to play video');
+    showError(`Failed to play video: ${error.message}`);
     console.error('Playback error:', error);
+    // Clean up if loading fails
+    closeVideoPlayer();
   } finally {
     hideLoading();
   }
@@ -581,12 +603,14 @@ function closeVideoPlayer() {
     ytPlayer = null;
   }
   videoPlayer.classList.add('hidden');
-  document.body.classList.remove('overflow-hidden'); // Allow body scroll again
+  document.body.classList.remove('overflow-hidden');
   currentVideoId = null;
   commentsNextPage = null;
   commentsList.innerHTML = '';
   loadMoreComments.style.display = 'none';
-  clearSponsorMarkers(); // Also clear markers when closing
+  clearSponsorMarkers();
+  clearChapters(); // Clear chapters UI
+  videoChapters = []; // Clear stored chapters
 }
 
 // Utility Functions
@@ -747,3 +771,103 @@ document.addEventListener('keydown', (event) => {
     }
   }
 });
+
+// --- Chapter Functions ---
+
+function displayChapters(chapters) {
+  chaptersList.innerHTML = ''; // Clear previous chapters
+
+  if (!chapters || chapters.length === 0) {
+    chaptersAccordion.classList.add('hidden'); // Hide accordion if no chapters
+    return;
+  }
+
+  chaptersAccordion.classList.remove('hidden'); // Show accordion
+
+  chapters.forEach((chapter, index) => {
+    const chapterElement = document.createElement('div');
+    chapterElement.className = 'chapter-item';
+    chapterElement.dataset.startTime = chapter.startTimeSeconds;
+    chapterElement.dataset.index = index;
+
+    const timeFormatted = formatTime(chapter.startTimeSeconds);
+
+    chapterElement.innerHTML = `
+      <span class="chapter-time">${timeFormatted}</span>
+      <span class="chapter-title">${chapter.title || 'Chapter ' + (index + 1)}</span>
+    `;
+
+    chapterElement.addEventListener('click', () => {
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        ytPlayer.seekTo(chapter.startTimeSeconds, true);
+        // Optionally close the accordion after clicking a chapter
+        if (!chaptersList.classList.contains('hidden')) {
+          toggleChaptersAccordion();
+        }
+      }
+    });
+
+    chaptersList.appendChild(chapterElement);
+  });
+
+  // Initial update for current chapter based on potential start time 0
+  updateCurrentChapterUI(ytPlayer?.getCurrentTime() || 0, chapters);
+}
+
+function updateCurrentChapterUI(currentTime, chapters) {
+  if (!chapters || chapters.length === 0 || !chaptersAccordion) return;
+
+  let currentChapterIndex = -1;
+  // Find the latest chapter whose start time is less than or equal to the current time
+  for (let i = chapters.length - 1; i >= 0; i--) {
+    if (chapters[i].startTimeSeconds <= currentTime) {
+      currentChapterIndex = i;
+      break;
+    }
+  }
+
+  // Update accordion header title
+  if (currentChapterIndex !== -1) {
+    currentChapterTitle.textContent = chapters[currentChapterIndex].title || `Chapter ${currentChapterIndex + 1}`;
+  } else {
+    currentChapterTitle.textContent = ''; // Or a default like "Introduction"
+  }
+
+  // Update highlighting in the list
+  const chapterItems = chaptersList.querySelectorAll('.chapter-item');
+  chapterItems.forEach((item, index) => {
+    if (index === currentChapterIndex) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+}
+
+function toggleChaptersAccordion() {
+  chaptersList.classList.toggle('hidden');
+  if (chaptersList.classList.contains('hidden')) {
+    chapterToggleIcon.classList.remove('fa-chevron-up');
+    chapterToggleIcon.classList.add('fa-chevron-down');
+  } else {
+    chapterToggleIcon.classList.remove('fa-chevron-down');
+    chapterToggleIcon.classList.add('fa-chevron-up');
+  }
+}
+
+function clearChapters() {
+  if (chaptersAccordion) {
+    chaptersAccordion.classList.add('hidden');
+  }
+  if (chaptersList) {
+    chaptersList.innerHTML = '';
+    chaptersList.classList.add('hidden'); // Ensure it's hidden
+  }
+  if (currentChapterTitle) {
+    currentChapterTitle.textContent = '';
+  }
+  if (chapterToggleIcon) {
+    chapterToggleIcon.classList.remove('fa-chevron-up');
+    chapterToggleIcon.classList.add('fa-chevron-down');
+  }
+}
