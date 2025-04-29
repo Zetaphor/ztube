@@ -66,7 +66,7 @@ app.get('/api/video/:id', async (req, res) => {
     const { id } = req.params;
     const video = await youtube.getInfo(id);
     // Keep this log uncommented for now, it's very helpful for debugging structure issues
-    // console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
+    console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
 
     let chapters = [];
     let markersMap = null;

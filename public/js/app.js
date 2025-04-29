@@ -509,7 +509,6 @@ function displayResults(results) {
 function createVideoCard(video) {
   const card = document.createElement('div');
   card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer';
-  card.onclick = () => playVideo(video.id, video.uploadedAt);
 
   // Get thumbnail URL
   const thumbnail = video.thumbnails?.[0]?.url || '';
@@ -522,6 +521,12 @@ function createVideoCard(video) {
 
   // Get upload date
   const uploadedAt = video.uploadedAt || 'Unknown date';
+
+  // Add data attribute
+  card.dataset.uploadedat = uploadedAt;
+
+  // Update onclick to pass the card element
+  card.onclick = () => playVideo(video.id, card);
 
   // Get channel name with verified badge if applicable
   const channelName = video.channel?.name || 'Unknown';
@@ -547,11 +552,18 @@ function createVideoCard(video) {
   return card;
 }
 
-async function playVideo(videoId, uploadedAt) {
+async function playVideo(videoId, videoCardElement) {
   try {
     showLoading();
     currentVideoId = videoId;
     document.body.classList.add('overflow-hidden');
+
+    // --- Get and display date from card immediately ---
+    const uploadedDateFromCard = videoCardElement.dataset.uploadedat;
+    if (uploadedDateFromCard) {
+      uploadDate.textContent = uploadedDateFromCard;
+    }
+    // --- End immediate date display ---
 
     // Get video details
     const detailsResponse = await fetch(`/api/video/${videoId}`);
@@ -560,7 +572,6 @@ async function playVideo(videoId, uploadedAt) {
       throw new Error(errorData.error || `Failed to fetch video details: ${detailsResponse.status}`);
     }
     const videoDetails = await detailsResponse.json();
-    console.log('Video Details with Chapters:', videoDetails);
 
     // Store chapters globally for this video
     videoChapters = videoDetails.chapters || [];
@@ -578,7 +589,6 @@ async function playVideo(videoId, uploadedAt) {
 
     subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     viewCount.textContent = videoDetails.view_count || '0 views';
-    uploadDate.textContent = videoDetails.published || 'Unknown date';
     videoDescription.textContent = videoDetails.description || '';
 
     // Load comments
