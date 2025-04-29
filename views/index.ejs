@@ -38,23 +38,27 @@
         <button id="closePlayer" class="absolute -top-10 right-4 text-white text-2xl">
           <i class="fas fa-times"></i>
         </button>
-        <div class="bg-black rounded-t-lg overflow-hidden">
-          <div id="player" class="w-full aspect-video yt-player-container"></div>
+        <div id="videoAreaContainer" class="bg-black rounded-t-lg overflow-hidden flex flex-col flex-grow">
+          <div id="player" class="w-full yt-player-container flex-grow"></div>
           <!-- Custom control bar (styling primarily in style.css) -->
           <div id="customControls" class="bg-zinc-800 bg-opacity-80 p-2 flex items-center space-x-4">
             <button id="playPauseBtn" class="text-white hover:text-green-500">
               <i class="fas fa-play"></i>
             </button>
-            <div class="flex-1 relative">
-              <div id="progressBar" class="h-1 bg-zinc-700 rounded cursor-pointer">
-                <div id="progress" class="h-full bg-green-600 rounded" style="width: 0%"></div>
-                <div id="segmentMarkers" class="absolute inset-0 pointer-events-none"></div>
-              </div>
-              <span id="currentTime" class="text-white text-sm absolute -bottom-5 left-0">0:00</span>
-              <span id="duration" class="text-white text-sm absolute -bottom-5 right-0">0:00</span>
-            </div>
-            <div class="flex items-center space-x-4">
+            <div class="flex-1 flex flex-col">
               <div class="relative">
+                <div id="progressBar" class="h-1 bg-zinc-700 rounded cursor-pointer">
+                  <div id="progress" class="h-full bg-green-600 rounded" style="width: 0%"></div>
+                  <div id="segmentMarkers" class="absolute inset-0 pointer-events-none"></div>
+                </div>
+              </div>
+              <div class="flex justify-between text-xs text-zinc-400 mt-1 px-1">
+                <span id="currentTime">0:00</span>
+                <span id="duration">0:00</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0 volume-controls">
+              <div class="relative volume-icon">
                 <button id="volumeBtn" class="text-white hover:text-green-500">
                   <i class="fas fa-volume-up"></i>
                 </button>
@@ -62,7 +66,7 @@
               <div id="volumeSlider" class="w-16 h-1 bg-zinc-700 rounded cursor-pointer ml-2">
                 <div id="volumeLevel" class="h-full rounded" style="width: 100%"></div>
               </div>
-              <div class="group relative">
+              <div class="group relative speed-controls">
                 <button id="playbackSpeedBtn" class="text-white hover:text-green-500">
                   <i class="fas fa-tachometer-alt"></i>
                 </button>
@@ -79,6 +83,9 @@
                   <div class="text-white text-sm px-4 py-1 hover:bg-green-600 cursor-pointer" data-speed="2">2x</div>
                 </div>
               </div>
+              <button id="theaterModeBtn" class="text-white hover:text-green-500">
+                <i class="fas fa-film"></i>
+              </button>
               <button id="fullscreenBtn" class="text-white hover:text-green-500">
                 <i class="fas fa-expand"></i>
               </button>

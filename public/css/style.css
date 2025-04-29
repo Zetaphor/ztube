@@ -148,16 +148,12 @@
 }
 
 #progressBar {
-  height: 4px;
+  height: 8px;
   transition: height 0.2s;
   position: relative;
   background: rgba(82, 82, 91, 0.3);
   /* Tailwind zinc-600 with opacity */
   cursor: pointer;
-}
-
-#progressBar:hover {
-  height: 8px;
 }
 
 #progress {
@@ -287,4 +283,93 @@
 #chaptersList .chapter-item.active .chapter-time {
   color: #34d399;
   /* green-400 */
+}
+
+/* Theater Mode Styles */
+#videoPlayer.theater-mode {
+  /* Ensure it still covers the screen */
+  padding-top: 0;
+  /* Override default padding if any */
+  padding-bottom: 0;
+  align-items: flex-start;
+  /* Align content to top */
+}
+
+#videoPlayer.theater-mode .relative {
+  /* w-full max-w-6xl mx-auto becomes: */
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  /* height: 100vh; */
+  /* Remove: Let it fill parent instead */
+  height: 100%;
+  /* Fill the #videoPlayer overlay */
+  display: flex;
+  flex-direction: column;
+}
+
+#videoPlayer.theater-mode .bg-black.rounded-t-lg {
+  flex-grow: 1;
+  /* Allow video section to grow */
+  display: flex;
+  flex-direction: column;
+}
+
+#videoPlayer.theater-mode #player {
+  flex-grow: 1;
+  /* Player takes available vertical space */
+  aspect-ratio: auto !important;
+  /* Override the aspect-video class */
+  /* height: 100%; */
+  /* Remove: Let flex-grow handle height */
+}
+
+#videoPlayer.theater-mode #player iframe {
+  width: 100% !important;
+  /* height: 100% !important; */
+  /* Remove: Let setSize handle height */
+  min-width: 100% !important;
+  /* min-height: 100% !important; */
+  /* Remove: Let setSize handle height */
+}
+
+#videoPlayer.theater-mode #chaptersAccordion,
+#videoPlayer.theater-mode #videoInfo {
+  width: 100%;
+  /* Ensure these elements take full width */
+  max-width: 1280px;
+  /* Optional: Limit width of info/chapters on large screens */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#videoPlayer.theater-mode #videoInfo {
+  max-height: 40vh;
+  /* Limit height of info/comments section */
+  overflow-y: auto;
+  border-radius: 0;
+  /* Remove bottom rounding */
+}
+
+#videoPlayer.theater-mode #commentsList {
+  max-height: none;
+}
+
+#videoPlayer.theater-mode .volume-icon {
+  width: 32px !important;
+}
+
+#videoPlayer.theater-mode #volumeSlider {
+  min-width: 64px !important;
+}
+
+#videoPlayer.theater-mode .volume-controls {
+  gap: 0 !important;
+}
+
+#videoPlayer.theater-mode .speed-controls {
+  width: 32px !important;
+  gap: 0 !important;
+  margin-left: 10px !important;
 }
