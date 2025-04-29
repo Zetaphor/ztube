@@ -840,11 +840,46 @@ async function fetchSponsorBlockSegments(videoId) {
 }
 
 function displaySponsorSegments() {
-  // Implementation of displaySponsorSegments function
+  const markersContainer = document.getElementById('segmentMarkers');
+  if (!markersContainer || !ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
+
+  const duration = ytPlayer.getDuration();
+  if (!duration || duration <= 0) {
+    console.log("SponsorBlock Display: Cannot display markers, invalid duration:", duration);
+    return;
+  }
+
+  clearSponsorMarkers(); // Clear existing markers first
+
+  if (sponsorSegments && sponsorSegments.length > 0) {
+    sponsorSegments.forEach(segment => {
+      const startTime = segment.segment[0];
+      const endTime = segment.segment[1];
+      const category = segment.category;
+
+      const startPercent = (startTime / duration) * 100;
+      const widthPercent = ((endTime - startTime) / duration) * 100;
+
+      const marker = document.createElement('div');
+      marker.className = 'segment-marker';
+      marker.style.left = `${startPercent}%`;
+      marker.style.width = `${widthPercent}%`;
+      marker.style.backgroundColor = segmentColors[category] || segmentColors['filler']; // Use filler as default
+      marker.title = `${category}: ${formatTime(startTime)} - ${formatTime(endTime)}`;
+
+      markersContainer.appendChild(marker);
+    });
+    console.log(`SponsorBlock Display: Added ${sponsorSegments.length} segment markers.`);
+  } else {
+    console.log("SponsorBlock Display: No segments to display.");
+  }
 }
 
 function clearSponsorMarkers() {
-  // Implementation of clearSponsorMarkers function
+  const markersContainer = document.getElementById('segmentMarkers');
+  if (markersContainer) {
+    markersContainer.innerHTML = ''; // Remove all child elements
+  }
 }
 
 function displayChapters(chapters) {
