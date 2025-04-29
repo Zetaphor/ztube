@@ -1,3 +1,6 @@
+import { showError, showLoading, hideLoading, formatTime } from './utils.js';
+import * as SponsorBlock from './sponsorblock.js';
+
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
@@ -8,7 +11,6 @@ let currentVideoId = null;
 let commentsNextPage = null;
 let ytPlayer = null;
 let progressTimer = null;
-let sponsorSegments = [];
 let videoChapters = [];
 let playerResizeObserver = null; // Add ResizeObserver state
 let keydownHandler = null; // Store the handler reference
@@ -147,7 +149,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     videoPlayer.classList.remove('hidden');
 
     // Fetch SponsorBlock data
-    fetchSponsorBlockSegments(videoId);
+    SponsorBlock.fetchSponsorBlockSegments(videoId);
 
     // Initialize YouTube player
     initializePlayer(videoId);
@@ -165,19 +167,6 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
   }
 }
 console.log("app.js: window.loadAndDisplayVideo defined", typeof window.loadAndDisplayVideo);
-// Define colors for different segment types
-const segmentColors = {
-  sponsor: 'rgba(239, 68, 68, 0.6)', // Red
-  selfpromo: 'rgba(34, 197, 94, 0.6)', // Green
-  interaction: 'rgba(59, 130, 246, 0.6)', // Blue
-  intro: 'rgba(168, 85, 247, 0.6)', // Purple
-  outro: 'rgba(168, 85, 247, 0.6)', // Purple (same as intro)
-  preview: 'rgba(245, 158, 11, 0.6)', // Amber
-  music_offtopic: 'rgba(234, 179, 8, 0.6)', // Yellow
-  poi_highlight: 'rgba(234, 179, 8, 0.6)', // Yellow (Same as music_offtopic now)
-  filler: 'rgba(107, 114, 128, 0.5)', // Gray
-  // Add other categories if needed
-};
 
 // Event Listeners
 // Check if elements exist before adding listeners
@@ -322,7 +311,6 @@ function onPlayerReady(event) {
   updateVolumeUI();
   if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
 
-  displaySponsorSegments();
   displayChapters(videoChapters);
   updatePlaybackProgress();
   startProgressTimer();
@@ -343,6 +331,9 @@ function onPlayerReady(event) {
       startProgressTimer();
     }
   }, 1000);
+
+  // Pass the player instance to SponsorBlock module
+  SponsorBlock.setPlayerInstance(event.target);
 }
 
 function onPlayerStateChange(event) {
@@ -494,24 +485,12 @@ function updatePlaybackProgress() {
     const totalDuration = ytPlayer.getDuration() || 0;
 
     // --- SponsorBlock Skip Logic ---
-    if (sponsorSegments && sponsorSegments.length > 0 && totalDuration > 0) {
-      const sponsorCategory = 'sponsor'; // Category to skip
-      for (const segment of sponsorSegments) {
-        if (segment.category === sponsorCategory) {
-          const startTime = segment.segment[0];
-          const endTime = segment.segment[1];
-          // Check if current time is within a sponsor segment (add a small buffer to prevent loops)
-          if (currentVideoTime >= startTime && currentVideoTime < endTime - 0.1) {
-            console.log(`SponsorBlock: Skipping segment from ${formatTime(startTime)} to ${formatTime(endTime)}`);
-            ytPlayer.seekTo(endTime, true);
-            // Update UI immediately after skipping
-            currentTime.textContent = formatTime(endTime);
-            const progressPercent = (endTime / totalDuration) * 100;
-            progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
-            return; // Exit early after skipping
-          }
-        }
-      }
+    if (SponsorBlock.checkAndSkipSponsorSegment(currentVideoTime, totalDuration)) {
+      // Update UI immediately after skipping
+      currentTime.textContent = formatTime(ytPlayer.getCurrentTime() || 0); // Get the new time after seek
+      const progressPercent = ((ytPlayer.getCurrentTime() || 0) / totalDuration) * 100;
+      progress.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
+      return; // Exit early after skipping
     }
     // --- End SponsorBlock Skip Logic ---
 
@@ -656,21 +635,6 @@ function toggleTheaterMode() {
   }
 }
 
-function formatTime(seconds) {
-  if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
-
-  // Handle hours for longer videos
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
 // Search Functions
 async function performSearch() {
   const query = searchInput.value.trim();
@@ -813,8 +777,7 @@ async function loadComments(videoId, continuation = null, commentsList, loadMore
     commentsNextPage = data.continuation;
     loadMoreComments.style.display = data.continuation ? 'block' : 'none';
 
-    sponsorSegments = []; // Clear segments
-    clearSponsorMarkers(); // Clear visual markers
+    SponsorBlock.clearSponsorSegmentsState(); // Clear state and markers
   } catch (error) {
     console.error('Failed to load comments:', error);
     commentsList.innerHTML = '<div class="text-center py-4 text-gray-500">Failed to load comments</div>';
@@ -901,7 +864,7 @@ function closeVideoPlayer() {
   commentsNextPage = null;
   if (commentsList) commentsList.innerHTML = '';
   if (loadMoreComments) loadMoreComments.style.display = 'none';
-  clearSponsorMarkers(); // Assumes this gets its element dynamically or doesn't need one
+  SponsorBlock.clearSponsorSegmentsState(); // Clear state and markers
   clearChapters(); // Assumes this gets its elements dynamically
   videoChapters = [];
   if (qualityBtn) qualityBtn.textContent = 'Auto';
@@ -915,283 +878,12 @@ function closeVideoPlayer() {
   }
 }
 
-// Utility Functions
-function formatDuration(seconds) {
-  if (!seconds) return '0:00';
-
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${padZero(minutes)}:${padZero(secs)}`;
-  }
-  return `${minutes}:${padZero(secs)}`;
-}
-
-function padZero(num) {
-  return num.toString().padStart(2, '0');
-}
-
-function formatViews(views) {
-  if (!views) return '0 views';
-
-  if (views >= 1000000) {
-    return `${(views / 1000000).toFixed(1)}M views`;
-  }
-  if (views >= 1000) {
-    return `${(views / 1000).toFixed(1)}K views`;
-  }
-  return `${views} views`;
-}
-
-function showLoading() {
-  const loader = document.createElement('div');
-  loader.className = 'loading';
-  loader.id = 'loader';
-  document.body.appendChild(loader);
-}
-
-function hideLoading() {
-  const loader = document.getElementById('loader');
-  if (loader) loader.remove();
-}
-
-function showError(message) {
-  const error = document.createElement('div');
-  error.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg';
-  error.textContent = message;
-  document.body.appendChild(error);
-  setTimeout(() => error.remove(), 3000);
-}
-
 // Add player error handling
 function onPlayerError(event) {
   console.error('YouTube player error:', event.data);
   showError('Video playback error. Please try again.');
-}
-
-// --- SponsorBlock Fetch Function ---
-
-async function fetchSponsorBlockSegments(videoId) {
-  try {
-    // Request more categories
-    const categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "filler"];
-    const apiUrl = `https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=${JSON.stringify(categories)}`;
-    const response = await fetch(apiUrl);
-    if (!response.ok) {
-      // Don't throw an error, just log it. SB might not have data.
-      console.log(`SponsorBlock: No segments found or API error for ${videoId} (${response.status})`);
-      sponsorSegments = [];
-      clearSponsorMarkers(); // Clear any old markers
-      return;
-    }
-    sponsorSegments = await response.json();
-    console.log(`SponsorBlock: ${sponsorSegments.length} segments found for ${videoId}`);
-  } catch (error) {
-    console.error('Failed to fetch SponsorBlock segments:', error);
-    sponsorSegments = [];
-    clearSponsorMarkers(); // Clear any old markers
-  }
-}
-
-function displaySponsorSegments() {
-  const markersContainer = document.getElementById('segmentMarkers');
-  if (!markersContainer || !ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
-
-  const duration = ytPlayer.getDuration();
-  if (!duration || duration <= 0) {
-    console.log("SponsorBlock Display: Cannot display markers, invalid duration:", duration);
-    return;
-  }
-
-  clearSponsorMarkers(); // Clear existing markers first
-
-  if (sponsorSegments && sponsorSegments.length > 0) {
-    sponsorSegments.forEach(segment => {
-      const startTime = segment.segment[0];
-      const endTime = segment.segment[1];
-      const category = segment.category;
-
-      const startPercent = (startTime / duration) * 100;
-      const widthPercent = ((endTime - startTime) / duration) * 100;
-
-      const marker = document.createElement('div');
-      marker.className = 'segment-marker';
-      marker.style.left = `${startPercent}%`;
-      marker.style.width = `${widthPercent}%`;
-      marker.style.backgroundColor = segmentColors[category] || segmentColors['filler']; // Use filler as default
-      marker.title = `${category}: ${formatTime(startTime)} - ${formatTime(endTime)}`;
-
-      markersContainer.appendChild(marker);
-    });
-    console.log(`SponsorBlock Display: Added ${sponsorSegments.length} segment markers.`);
-  } else {
-    console.log("SponsorBlock Display: No segments to display.");
-  }
-}
-
-function clearSponsorMarkers() {
-  const markersContainer = document.getElementById('segmentMarkers');
-  if (markersContainer) {
-    markersContainer.innerHTML = ''; // Remove all child elements
-  }
-}
-
-function displayChapters(chapters) {
-  const chaptersAccordion = document.getElementById('chaptersAccordion');
-  const chaptersList = document.getElementById('chaptersList');
-  const chaptersHeader = document.getElementById('chaptersHeader');
-  const progressBar = document.getElementById('progressBar'); // Get progress bar here
-  const chapterToggleIcon = document.getElementById('chapterToggleIcon'); // Get toggle icon
-
-  if (!chaptersAccordion || !chaptersList || !chaptersHeader || !progressBar || !chapterToggleIcon) {
-    console.warn("Chapter UI elements not found. Cannot display chapters.");
-    return;
-  }
-
-  clearChapters(); // Assumes dynamic elements
-
-  if (!chapters || chapters.length === 0 || !ytPlayer || typeof ytPlayer.getDuration !== 'function') {
-    console.log("No chapters available or player not ready for this video.");
-    chaptersAccordion.classList.add('hidden');
-    return;
-  }
-
-  const duration = ytPlayer.getDuration();
-  if (!duration || duration <= 0) {
-    console.warn("Cannot display chapter markers, invalid video duration:", duration);
-    chaptersAccordion.classList.add('hidden');
-    return;
-  }
-
-  console.log(`Displaying ${chapters.length} chapters.`);
-  chaptersAccordion.classList.remove('hidden'); // Show the accordion
-
-  // Sort chapters just in case they aren't already
-  const sortedChapters = chapters.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
-
-  sortedChapters.forEach((chapter, index) => {
-    const startTime = chapter.startTimeSeconds;
-
-    // --- Create Chapter List Item ---
-    const chapterItem = document.createElement('div');
-    chapterItem.className = 'chapter-item flex items-center justify-between p-2 cursor-pointer hover:bg-zinc-700';
-    chapterItem.dataset.startTime = startTime;
-
-    const timeStr = formatTime(startTime);
-    chapterItem.innerHTML = `
-      <div class="flex items-center">
-        <span class="chapter-time text-xs text-zinc-400 mr-2">${timeStr}</span>
-        <span class="chapter-title text-sm text-zinc-200">${chapter.title || `Chapter ${index + 1}`}</span>
-      </div>
-      ${chapter.thumbnailUrl ? `<img src="${chapter.thumbnailUrl}" alt="${chapter.title}" class="w-16 h-9 object-cover rounded ml-2">` : ''}
-    `;
-
-    chapterItem.addEventListener('click', () => {
-      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
-        ytPlayer.seekTo(startTime, true);
-      }
-    });
-    chaptersList.appendChild(chapterItem);
-    // --- End Chapter List Item ---
-
-    // --- Create Chapter Marker on Progress Bar ---
-    // Skip marker for the very first chapter (start time 0)
-    if (startTime > 0) {
-      const marker = document.createElement('div');
-      marker.className = 'chapter-marker'; // Add class for styling and clearing
-      const startPercent = (startTime / duration) * 100;
-      marker.style.left = `${startPercent}%`;
-      marker.title = `Chapter: ${chapter.title || `Chapter ${index + 1}`} (${timeStr})`; // Add tooltip
-      // Append directly to progressBar, but behind the progress indicator
-      progressBar.appendChild(marker);
-    }
-    // --- End Chapter Marker ---
-  });
-
-  // Initially hide the list and set the icon
-  chaptersList.classList.add('hidden');
-  chapterToggleIcon.classList.remove('fa-chevron-up');
-  chapterToggleIcon.classList.add('fa-chevron-down');
-}
-
-function updateCurrentChapterUI(currentTime, chapters) {
-  const chaptersList = document.getElementById('chaptersList');
-  const currentChapterTitle = document.getElementById('currentChapterTitle');
-  const chaptersAccordion = document.getElementById('chaptersAccordion');
-
-  if (!chaptersList || !currentChapterTitle || !chaptersAccordion || chaptersAccordion.classList.contains('hidden')) {
-    return;
-  }
-
-  if (!chapters || chapters.length === 0) {
-    currentChapterTitle.textContent = ''; // Clear title if no chapters
-    return;
-  }
-
-  let activeChapter = null;
-  // Find the latest chapter whose start time is less than or equal to the current time
-  for (let i = chapters.length - 1; i >= 0; i--) {
-    if (currentTime >= chapters[i].startTimeSeconds) {
-      activeChapter = chapters[i];
-      break;
-    }
-  }
-
-  // Update the header title
-  currentChapterTitle.textContent = activeChapter ? activeChapter.title : '';
-
-  // Update active class in the list
-  const chapterItems = chaptersList.querySelectorAll('.chapter-item');
-  chapterItems.forEach(item => {
-    const itemStartTime = parseFloat(item.dataset.startTime);
-    if (activeChapter && itemStartTime === activeChapter.startTimeSeconds) {
-      item.classList.add('active', 'bg-zinc-600'); // Add active styles
-    } else {
-      item.classList.remove('active', 'bg-zinc-600'); // Remove active styles
-    }
-  });
-}
-
-function toggleChaptersAccordion() {
-  const chaptersList = document.getElementById('chaptersList');
-  const chapterToggleIcon = document.getElementById('chapterToggleIcon');
-  if (!chaptersList || !chapterToggleIcon) return;
-
-  const isHidden = chaptersList.classList.toggle('hidden');
-  if (isHidden) {
-    chapterToggleIcon.classList.remove('fa-chevron-up');
-    chapterToggleIcon.classList.add('fa-chevron-down');
-  } else {
-    chapterToggleIcon.classList.remove('fa-chevron-down');
-    chapterToggleIcon.classList.add('fa-chevron-up');
-    // Scroll the active chapter into view when opening
-    const activeItem = chaptersList.querySelector('.chapter-item.active');
-    if (activeItem) {
-      activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }
-}
-
-function clearChapters() {
-  const chaptersAccordion = document.getElementById('chaptersAccordion');
-  const chaptersList = document.getElementById('chaptersList');
-  const currentChapterTitle = document.getElementById('currentChapterTitle');
-  const chapterToggleIcon = document.getElementById('chapterToggleIcon');
-  const progressBar = document.getElementById('progressBar');
-
-  if (chaptersAccordion) chaptersAccordion.classList.add('hidden');
-  if (chaptersList) chaptersList.innerHTML = '';
-  if (currentChapterTitle) currentChapterTitle.textContent = '';
-  if (chapterToggleIcon) {
-    chapterToggleIcon.classList.remove('fa-chevron-up');
-    chapterToggleIcon.classList.add('fa-chevron-down');
-  }
-  if (progressBar) {
-    const existingMarkers = progressBar.querySelectorAll('.chapter-marker');
-    existingMarkers.forEach(marker => marker.remove());
-  }
+  // Also clear SponsorBlock state on error
+  SponsorBlock.clearSponsorSegmentsState();
 }
 
 // --- Keyboard Shortcuts ---
@@ -1434,3 +1126,163 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('Checking window.loadAndDisplayVideo on DOMContentLoaded:', typeof window.loadAndDisplayVideo);
 
 });
+
+// --- Chapters Functions ---
+
+function displayChapters(chapters) {
+  const chaptersAccordion = document.getElementById('chaptersAccordion');
+  const chaptersList = document.getElementById('chaptersList');
+  const chaptersHeader = document.getElementById('chaptersHeader');
+  const progressBar = document.getElementById('progressBar'); // Get progress bar here
+  const chapterToggleIcon = document.getElementById('chapterToggleIcon'); // Get toggle icon
+
+  if (!chaptersAccordion || !chaptersList || !chaptersHeader || !progressBar || !chapterToggleIcon) {
+    console.warn("Chapter UI elements not found. Cannot display chapters.");
+    return;
+  }
+
+  clearChapters(); // Assumes dynamic elements
+
+  if (!chapters || chapters.length === 0 || !ytPlayer || typeof ytPlayer.getDuration !== 'function') {
+    console.log("No chapters available or player not ready for this video.");
+    chaptersAccordion.classList.add('hidden');
+    return;
+  }
+
+  const duration = ytPlayer.getDuration();
+  if (!duration || duration <= 0) {
+    console.warn("Cannot display chapter markers, invalid video duration:", duration);
+    chaptersAccordion.classList.add('hidden');
+    return;
+  }
+
+  console.log(`Displaying ${chapters.length} chapters.`);
+  chaptersAccordion.classList.remove('hidden'); // Show the accordion
+
+  // Sort chapters just in case they aren't already
+  const sortedChapters = chapters.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
+
+  sortedChapters.forEach((chapter, index) => {
+    const startTime = chapter.startTimeSeconds;
+
+    // --- Create Chapter List Item ---
+    const chapterItem = document.createElement('div');
+    chapterItem.className = 'chapter-item flex items-center justify-between p-2 cursor-pointer hover:bg-zinc-700';
+    chapterItem.dataset.startTime = startTime;
+
+    const timeStr = formatTime(startTime);
+    chapterItem.innerHTML = `
+      <div class="flex items-center">
+        <span class="chapter-time text-xs text-zinc-400 mr-2">${timeStr}</span>
+        <span class="chapter-title text-sm text-zinc-200">${chapter.title || `Chapter ${index + 1}`}</span>
+      </div>
+      ${chapter.thumbnailUrl ? `<img src="${chapter.thumbnailUrl}" alt="${chapter.title}" class="w-16 h-9 object-cover rounded ml-2">` : ''}
+    `;
+
+    chapterItem.addEventListener('click', () => {
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        ytPlayer.seekTo(startTime, true);
+      }
+    });
+    chaptersList.appendChild(chapterItem);
+    // --- End Chapter List Item ---
+
+    // --- Create Chapter Marker on Progress Bar ---
+    // Skip marker for the very first chapter (start time 0)
+    if (startTime > 0) {
+      const marker = document.createElement('div');
+      marker.className = 'chapter-marker'; // Add class for styling and clearing
+      const startPercent = (startTime / duration) * 100;
+      marker.style.left = `${startPercent}%`;
+      marker.title = `Chapter: ${chapter.title || `Chapter ${index + 1}`} (${timeStr})`; // Add tooltip
+      // Append directly to progressBar, but behind the progress indicator
+      progressBar.appendChild(marker);
+    }
+    // --- End Chapter Marker ---
+  });
+
+  // Initially hide the list and set the icon
+  chaptersList.classList.add('hidden');
+  chapterToggleIcon.classList.remove('fa-chevron-up');
+  chapterToggleIcon.classList.add('fa-chevron-down');
+}
+
+function updateCurrentChapterUI(currentTime, chapters) {
+  const chaptersList = document.getElementById('chaptersList');
+  const currentChapterTitle = document.getElementById('currentChapterTitle');
+  const chaptersAccordion = document.getElementById('chaptersAccordion');
+
+  if (!chaptersList || !currentChapterTitle || !chaptersAccordion || chaptersAccordion.classList.contains('hidden')) {
+    return;
+  }
+
+  if (!chapters || chapters.length === 0) {
+    currentChapterTitle.textContent = ''; // Clear title if no chapters
+    return;
+  }
+
+  let activeChapter = null;
+  // Find the latest chapter whose start time is less than or equal to the current time
+  for (let i = chapters.length - 1; i >= 0; i--) {
+    if (currentTime >= chapters[i].startTimeSeconds) {
+      activeChapter = chapters[i];
+      break;
+    }
+  }
+
+  // Update the header title
+  currentChapterTitle.textContent = activeChapter ? activeChapter.title : '';
+
+  // Update active class in the list
+  const chapterItems = chaptersList.querySelectorAll('.chapter-item');
+  chapterItems.forEach(item => {
+    const itemStartTime = parseFloat(item.dataset.startTime);
+    if (activeChapter && itemStartTime === activeChapter.startTimeSeconds) {
+      item.classList.add('active', 'bg-zinc-600'); // Add active styles
+    } else {
+      item.classList.remove('active', 'bg-zinc-600'); // Remove active styles
+    }
+  });
+}
+
+function toggleChaptersAccordion() {
+  const chaptersList = document.getElementById('chaptersList');
+  const chapterToggleIcon = document.getElementById('chapterToggleIcon');
+  if (!chaptersList || !chapterToggleIcon) return;
+
+  const isHidden = chaptersList.classList.toggle('hidden');
+  if (isHidden) {
+    chapterToggleIcon.classList.remove('fa-chevron-up');
+    chapterToggleIcon.classList.add('fa-chevron-down');
+  } else {
+    chapterToggleIcon.classList.remove('fa-chevron-down');
+    chapterToggleIcon.classList.add('fa-chevron-up');
+    // Scroll the active chapter into view when opening
+    const activeItem = chaptersList.querySelector('.chapter-item.active');
+    if (activeItem) {
+      activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+}
+
+function clearChapters() {
+  const chaptersAccordion = document.getElementById('chaptersAccordion');
+  const chaptersList = document.getElementById('chaptersList');
+  const currentChapterTitle = document.getElementById('currentChapterTitle');
+  const chapterToggleIcon = document.getElementById('chapterToggleIcon');
+  const progressBar = document.getElementById('progressBar');
+
+  if (chaptersAccordion) chaptersAccordion.classList.add('hidden');
+  if (chaptersList) chaptersList.innerHTML = '';
+  if (currentChapterTitle) currentChapterTitle.textContent = '';
+  if (chapterToggleIcon) {
+    chapterToggleIcon.classList.remove('fa-chevron-up');
+    chapterToggleIcon.classList.add('fa-chevron-down');
+  }
+  if (progressBar) {
+    const existingMarkers = progressBar.querySelectorAll('.chapter-marker');
+    existingMarkers.forEach(marker => marker.remove());
+  }
+}
+
+// --- End Chapters Functions ---
