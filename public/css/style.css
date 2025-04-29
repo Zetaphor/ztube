@@ -36,7 +36,8 @@
 .video-meta {
   display: flex;
   align-items: center;
-  color: #606060;
+  color: #a1a1aa;
+  /* Tailwind zinc-400 for dark mode */
   font-size: 14px;
 }
 
@@ -50,7 +51,8 @@
   display: inline-block;
   width: 50px;
   height: 50px;
-  border: 3px solid rgba(255, 255, 255, .3);
+  border: 3px solid rgba(74, 85, 104, 0.5);
+  /* Darker semi-transparent border */
   border-radius: 50%;
   border-top-color: #fff;
   animation: spin 1s ease-in-out infinite;
@@ -68,17 +70,20 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #27272a;
+  /* Tailwind zinc-800 */
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: #52525b;
+  /* Tailwind zinc-600 */
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #71717a;
+  /* Tailwind zinc-500 */
 }
 
 /* Comments section scrollbar */
@@ -87,17 +92,20 @@
 }
 
 #commentsList::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #27272a;
+  /* Tailwind zinc-800 */
   border-radius: 3px;
 }
 
 #commentsList::-webkit-scrollbar-thumb {
-  background: #ddd;
+  background: #52525b;
+  /* Tailwind zinc-600 */
   border-radius: 3px;
 }
 
 #commentsList::-webkit-scrollbar-thumb:hover {
-  background: #ccc;
+  background: #71717a;
+  /* Tailwind zinc-500 */
 }
 
 /* Video description scrollbar */
@@ -106,17 +114,20 @@
 }
 
 #videoDescription::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #27272a;
+  /* Tailwind zinc-800 */
   border-radius: 3px;
 }
 
 #videoDescription::-webkit-scrollbar-thumb {
-  background: #ddd;
+  background: #52525b;
+  /* Tailwind zinc-600 */
   border-radius: 3px;
 }
 
 #videoDescription::-webkit-scrollbar-thumb:hover {
-  background: #ccc;
+  background: #71717a;
+  /* Tailwind zinc-500 */
 }
 
 /* Custom video controls */
@@ -129,7 +140,8 @@
   height: 4px;
   transition: height 0.2s;
   position: relative;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(82, 82, 91, 0.3);
+  /* Tailwind zinc-600 with opacity */
   cursor: pointer;
 }
 
@@ -142,14 +154,16 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: #e53e3e;
+  background: #38a169;
+  /* Tailwind green-600 */
   transition: width 0.1s linear;
 }
 
 #volumeSlider {
   width: 80px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(82, 82, 91, 0.4);
+  /* Tailwind zinc-600 with opacity */
   border-radius: 2px;
   position: absolute;
   bottom: 100%;
@@ -160,14 +174,16 @@
 }
 
 #volumeLevel {
-  background: #e53e3e;
+  background: #38a169;
+  /* Tailwind green-600 */
   height: 100%;
   border-radius: 2px;
   transition: width 0.1s;
 }
 
 #speedOptions {
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(63, 63, 70, 0.9);
+  /* Tailwind zinc-700 with opacity */
   border-radius: 4px;
   padding: 4px 0;
 }
@@ -179,7 +195,8 @@
 }
 
 #speedOptions div:hover {
-  background-color: rgba(229, 62, 62, 0.8);
+  background-color: rgba(56, 161, 105, 0.8);
+  /* Tailwind green-600 hover */
 }
 
 /* Control button hover effects */
@@ -193,7 +210,8 @@
 }
 
 #customControls button:hover {
-  color: #e53e3e;
+  color: #38a169;
+  /* Tailwind green-600 */
 }
 
 /* Time display */

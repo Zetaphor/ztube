@@ -363,7 +363,7 @@ function displayResults(results) {
 
 function createVideoCard(video) {
   const card = document.createElement('div');
-  card.className = 'video-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer';
+  card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer';
   card.onclick = () => playVideo(video.id);
 
   // Get thumbnail URL
@@ -381,7 +381,7 @@ function createVideoCard(video) {
   // Get channel name with verified badge if applicable
   const channelName = video.channel?.name || 'Unknown';
   const verifiedBadge = video.channel?.verified ?
-    '<i class="fas fa-check-circle text-blue-500 ml-1" title="Verified Channel"></i>' :
+    '<i class="fas fa-check-circle text-green-500 ml-1" title="Verified Channel"></i>' :
     '';
 
   card.innerHTML = `
@@ -390,7 +390,7 @@ function createVideoCard(video) {
             <span class="video-duration">${duration}</span>
         </div>
         <div class="p-4">
-            <h3 class="font-semibold text-gray-800 line-clamp-2">${video.title || 'Untitled'}</h3>
+            <h3 class="font-semibold text-zinc-100 line-clamp-2">${video.title || 'Untitled'}</h3>
             <div class="video-meta mt-2">
                 <span class="flex items-center">${channelName}${verifiedBadge}</span>
                 <span>${views}</span>
@@ -500,12 +500,12 @@ function createCommentElement(comment) {
     <img src="${avatar}" alt="${authorName}" class="w-10 h-10 rounded-full">
     <div class="flex-1">
       <div class="flex items-center mb-1">
-        <a href="#" class="font-medium mr-2">${authorName}</a>
-        <span class="text-gray-500 text-sm">${publishedTime}</span>
+        <a href="#" class="font-medium text-zinc-100 hover:text-green-500 mr-2">${authorName}</a>
+        <span class="text-zinc-400 text-sm">${publishedTime}</span>
       </div>
-      <p class="text-gray-800">${content}</p>
-      <div class="flex items-center mt-2 text-gray-500 text-sm">
-        <button class="flex items-center hover:text-gray-700">
+      <p class="text-zinc-200">${content}</p>
+      <div class="flex items-center mt-2 text-zinc-400 text-sm">
+        <button class="flex items-center hover:text-zinc-300">
           <i class="fas fa-thumbs-up mr-1"></i>
           <span>${likeCount}</span>
         </button>
