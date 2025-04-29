@@ -775,43 +775,58 @@ document.addEventListener('keydown', (event) => {
 // --- Chapter Functions ---
 
 function displayChapters(chapters) {
-  chaptersList.innerHTML = ''; // Clear previous chapters
-
-  if (!chapters || chapters.length === 0) {
-    chaptersAccordion.classList.add('hidden'); // Hide accordion if no chapters
-    return;
+  if (chapters && chapters.length > 0) {
+    updateCurrentChapterUI(0, videoChapters); // Initial update
+    console.log("Displaying chapters: ", chapters); // Log received chapters
+  } else {
+    chaptersAccordion.classList.add('hidden');
+    chaptersList.innerHTML = ''; // Clear any old chapters
+    chaptersList.classList.add('hidden');
+    chapterToggleIcon.className = 'fas fa-chevron-down';
+    console.log("No chapters found for this video.");
+    return; // Exit if no chapters
   }
 
-  chaptersAccordion.classList.remove('hidden'); // Show accordion
+  chaptersList.innerHTML = ''; // Clear previous chapters
 
   chapters.forEach((chapter, index) => {
     const chapterElement = document.createElement('div');
-    chapterElement.className = 'chapter-item';
-    chapterElement.dataset.startTime = chapter.startTimeSeconds;
-    chapterElement.dataset.index = index;
-
-    const timeFormatted = formatTime(chapter.startTimeSeconds);
-
-    chapterElement.innerHTML = `
-      <span class="chapter-time">${timeFormatted}</span>
-      <span class="chapter-title">${chapter.title || 'Chapter ' + (index + 1)}</span>
-    `;
-
+    chapterElement.className = 'flex items-center p-2 hover:bg-zinc-600 cursor-pointer';
     chapterElement.addEventListener('click', () => {
       if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
         ytPlayer.seekTo(chapter.startTimeSeconds, true);
-        // Optionally close the accordion after clicking a chapter
-        if (!chaptersList.classList.contains('hidden')) {
-          toggleChaptersAccordion();
-        }
       }
     });
+
+    // Thumbnail (if available)
+    if (chapter.thumbnailUrl) {
+      const img = document.createElement('img');
+      img.src = chapter.thumbnailUrl;
+      img.alt = `Thumbnail for ${chapter.title}`;
+      img.className = 'w-16 h-9 object-cover rounded mr-3'; // Adjust size as needed
+      chapterElement.appendChild(img);
+    }
+
+    // Chapter Info Container
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'flex-1';
+
+    const titleElement = document.createElement('span');
+    titleElement.className = 'text-sm text-zinc-200 block'; // Removed truncate
+    titleElement.textContent = chapter.title;
+    infoDiv.appendChild(titleElement);
+
+    const timeElement = document.createElement('span');
+    timeElement.className = 'text-xs text-zinc-400 block';
+    timeElement.textContent = formatTime(chapter.startTimeSeconds);
+    infoDiv.appendChild(timeElement);
+
+    chapterElement.appendChild(infoDiv);
 
     chaptersList.appendChild(chapterElement);
   });
 
-  // Initial update for current chapter based on potential start time 0
-  updateCurrentChapterUI(ytPlayer?.getCurrentTime() || 0, chapters);
+  chaptersAccordion.classList.remove('hidden');
 }
 
 function updateCurrentChapterUI(currentTime, chapters) {

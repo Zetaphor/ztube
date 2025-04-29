@@ -93,6 +93,8 @@ app.get('/api/video/:id', async (req, res) => {
               const title = chapter.title?.text;
               // Extract startTimeMs directly from chapter object
               const startTimeMs = chapter.time_range_start_millis;
+              // Extract the first thumbnail URL
+              const thumbnailUrl = chapter.thumbnail?.[0]?.url;
 
               if (typeof title !== 'string' || typeof startTimeMs !== 'number') {
                 console.warn(`Invalid data in chapter at index ${index}: title=${title}, startTimeMs=${startTimeMs}`);
@@ -102,6 +104,7 @@ app.get('/api/video/:id', async (req, res) => {
               return {
                 title: title || `Chapter ${index + 1}`,
                 startTimeSeconds: startTimeMs / 1000,
+                thumbnailUrl: thumbnailUrl || null,
               };
             })
             .filter(chapter => chapter !== null)
@@ -193,7 +196,7 @@ app.get('/api/comments/:id', async (req, res) => {
     }
 
     // Debug logging
-    console.log('Raw comments data:', commentsData);
+    // console.log('Raw comments data:', commentsData);
 
     // Check if we have valid comments data
     if (!commentsData || !commentsData.contents) {
