@@ -18,6 +18,13 @@ const uploadDate = document.getElementById('uploadDate');
 const commentsList = document.getElementById('commentsList');
 const loadMoreComments = document.getElementById('loadMoreComments');
 
+// Chapter elements
+const chaptersAccordion = document.getElementById('chaptersAccordion');
+const chaptersHeader = document.getElementById('chaptersHeader');
+const currentChapterTitle = document.getElementById('currentChapterTitle');
+const chapterToggleIcon = document.getElementById('chapterToggleIcon');
+const chaptersList = document.getElementById('chaptersList');
+
 // Custom controls elements
 const playPauseBtn = document.getElementById('playPauseBtn');
 const progressBar = document.getElementById('progressBar');
@@ -841,19 +848,120 @@ function clearSponsorMarkers() {
 }
 
 function displayChapters(chapters) {
-  // Implementation of displayChapters function
+  // Ensure elements exist before proceeding
+  if (!chaptersAccordion || !chaptersList || !chaptersHeader) {
+    console.warn("Chapter UI elements not found. Cannot display chapters.");
+    return;
+  }
+
+  clearChapters(); // Clear previous chapters first
+
+  if (!chapters || chapters.length === 0) {
+    console.log("No chapters available for this video.");
+    chaptersAccordion.classList.add('hidden');
+    return;
+  }
+
+  console.log(`Displaying ${chapters.length} chapters.`);
+  chaptersAccordion.classList.remove('hidden'); // Show the accordion
+
+  // Sort chapters just in case they aren't already
+  const sortedChapters = chapters.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
+
+  sortedChapters.forEach((chapter, index) => {
+    const chapterItem = document.createElement('div');
+    chapterItem.className = 'chapter-item flex items-center justify-between p-2 cursor-pointer hover:bg-zinc-700';
+    chapterItem.dataset.startTime = chapter.startTimeSeconds;
+
+    const timeStr = formatTime(chapter.startTimeSeconds);
+    chapterItem.innerHTML = `
+      <div class="flex items-center">
+        <span class="chapter-time text-xs text-zinc-400 mr-2">${timeStr}</span>
+        <span class="chapter-title text-sm text-zinc-200">${chapter.title || `Chapter ${index + 1}`}</span>
+      </div>
+      ${chapter.thumbnailUrl ? `<img src="${chapter.thumbnailUrl}" alt="${chapter.title}" class="w-16 h-9 object-cover rounded ml-2">` : ''}
+    `;
+
+    chapterItem.addEventListener('click', () => {
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        ytPlayer.seekTo(chapter.startTimeSeconds, true);
+        // Optional: Close accordion after clicking a chapter
+        // chaptersList.classList.add('hidden');
+        // chapterToggleIcon.classList.remove('fa-chevron-up');
+        // chapterToggleIcon.classList.add('fa-chevron-down');
+      }
+    });
+
+    chaptersList.appendChild(chapterItem);
+  });
+
+  // Initially hide the list and set the icon
+  chaptersList.classList.add('hidden');
+  chapterToggleIcon.classList.remove('fa-chevron-up');
+  chapterToggleIcon.classList.add('fa-chevron-down');
 }
 
 function updateCurrentChapterUI(currentTime, chapters) {
-  // Implementation of updateCurrentChapterUI function
+  // Ensure elements exist
+  if (!chaptersList || !currentChapterTitle || !chaptersAccordion || chaptersAccordion.classList.contains('hidden')) {
+    return; // Don't update if chapters aren't displayed or elements are missing
+  }
+
+  if (!chapters || chapters.length === 0) {
+    currentChapterTitle.textContent = ''; // Clear title if no chapters
+    return;
+  }
+
+  let activeChapter = null;
+  // Find the latest chapter whose start time is less than or equal to the current time
+  for (let i = chapters.length - 1; i >= 0; i--) {
+    if (currentTime >= chapters[i].startTimeSeconds) {
+      activeChapter = chapters[i];
+      break;
+    }
+  }
+
+  // Update the header title
+  currentChapterTitle.textContent = activeChapter ? activeChapter.title : '';
+
+  // Update active class in the list
+  const chapterItems = chaptersList.querySelectorAll('.chapter-item');
+  chapterItems.forEach(item => {
+    const itemStartTime = parseFloat(item.dataset.startTime);
+    if (activeChapter && itemStartTime === activeChapter.startTimeSeconds) {
+      item.classList.add('active', 'bg-zinc-600'); // Add active styles
+    } else {
+      item.classList.remove('active', 'bg-zinc-600'); // Remove active styles
+    }
+  });
 }
 
 function toggleChaptersAccordion() {
-  // Implementation of toggleChaptersAccordion function
+  if (!chaptersList || !chapterToggleIcon) return;
+
+  const isHidden = chaptersList.classList.toggle('hidden');
+  if (isHidden) {
+    chapterToggleIcon.classList.remove('fa-chevron-up');
+    chapterToggleIcon.classList.add('fa-chevron-down');
+  } else {
+    chapterToggleIcon.classList.remove('fa-chevron-down');
+    chapterToggleIcon.classList.add('fa-chevron-up');
+    // Scroll the active chapter into view when opening
+    const activeItem = chaptersList.querySelector('.chapter-item.active');
+    if (activeItem) {
+      activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
 }
 
 function clearChapters() {
-  // Implementation of clearChapters function
+  if (chaptersAccordion) chaptersAccordion.classList.add('hidden');
+  if (chaptersList) chaptersList.innerHTML = ''; // Clear list content
+  if (currentChapterTitle) currentChapterTitle.textContent = ''; // Clear header title
+  if (chapterToggleIcon) { // Reset icon
+    chapterToggleIcon.classList.remove('fa-chevron-up');
+    chapterToggleIcon.classList.add('fa-chevron-down');
+  }
 }
 
 // --- Keyboard Shortcuts ---
