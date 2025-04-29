@@ -48,19 +48,30 @@
 
 /* Loading animation */
 .loading {
-  display: inline-block;
-  width: 50px;
-  height: 50px;
-  border: 3px solid rgba(74, 85, 104, 0.5);
+  position: fixed;
+  /* Position relative to the viewport */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* Center the spinner */
+  width: 80px;
+  height: 80px;
+  border: 6px solid rgba(74, 85, 104, 0.5);
   /* Darker semi-transparent border */
   border-radius: 50%;
   border-top-color: #fff;
   animation: spin 1s ease-in-out infinite;
+  z-index: 9999;
+  /* Ensure it's on top */
 }
 
 @keyframes spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
   to {
-    transform: rotate(360deg);
+    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
 
