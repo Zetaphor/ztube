@@ -69,11 +69,6 @@ searchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') performSearch();
 });
 closePlayer.addEventListener('click', closeVideoPlayer);
-// qualitySelect.addEventListener('change', () => {
-//   if (currentVideoId) {
-//     updateVideoQuality(currentVideoId);
-//   }
-// });
 
 // Initialize YouTube player
 function onYouTubeIframeAPIReady() {
@@ -462,8 +457,6 @@ function toggleTheaterMode() {
   } else {
     theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>'; // Original icon
   }
-
-  // NO NEED to manually resize here - ResizeObserver handles it
 }
 
 function formatTime(seconds) {
@@ -607,18 +600,6 @@ async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
     videoTitle.textContent = videoDetails.title || 'Unknown';
     channelName.textContent = videoDetails.author?.name || 'Unknown';
     channelName.href = `/channel/${videoDetails.author?.id || ''}`;
-
-    // Optionally, update avatar *again* if details API provides a (potentially better) one
-    // This overrides the one from the card if the details API has one.
-    const avatarFromDetails = videoDetails.author?.thumbnails?.[0]?.url;
-    console.log("Avatar URL from details API:", avatarFromDetails); // Log details API URL
-    /* REMOVED THIS BLOCK
-    if (avatarFromDetails) {
-      channelAvatar.src = avatarFromDetails;
-      console.log("Updated channelAvatar.src to (from details API):", channelAvatar.src); // Log update
-    }
-    */
-    // else keep the one from the card or the default
 
     subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     viewCount.textContent = videoDetails.view_count || '0 views';
@@ -1058,7 +1039,6 @@ function handleKeydown(event) {
         volumeLevel.style.width = `${newVolume * 100}%`;
       }
       break;
-    // Add cases for 'm' (mute/unmute), 'f' (fullscreen), 't' (theater mode) if desired
     case 't':
     case 'T':
       toggleTheaterMode();
