@@ -48,9 +48,11 @@ let sponsorSegments = [];
 let videoChapters = [];
 let playerResizeObserver = null; // Add ResizeObserver state
 let keydownHandler = null; // Store the handler reference
+let keydownAttached = false; // Track if the listener is attached
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
-window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
+// Make videoCardElement optional and default to null
+window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
   // Get player overlay elements dynamically
   const videoPlayer = document.getElementById('videoPlayer');
   const channelAvatar = document.getElementById('channelAvatar');
@@ -73,13 +75,16 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
     currentVideoId = videoId;
     document.body.classList.add('overflow-hidden');
 
-    // --- Get and display date from card immediately ---
+    // --- Get and display date from card immediately (check if card exists) ---
     const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
     if (uploadedDateFromCard && uploadDate) {
       uploadDate.textContent = uploadedDateFromCard;
+    } else if (uploadDate) {
+      // Clear or set default if no card info
+      uploadDate.textContent = '';
     }
 
-    // --- Get avatar from card if available ---
+    // --- Get avatar from card if available (check if card exists) ---
     const channelAvatarElement = videoCardElement?.querySelector('img[alt*="avatar"]');
     const channelAvatarUrlFromCard = channelAvatarElement?.src;
     if (channelAvatar && channelAvatarUrlFromCard && (channelAvatarUrlFromCard.startsWith('http') || channelAvatarUrlFromCard.startsWith('/'))) {
@@ -105,18 +110,20 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
     if (channelName) channelName.textContent = videoDetails.author?.name || 'Unknown';
     if (channelName) channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#';
 
-    // Update avatar if details provide a better one
-    if (channelAvatar && videoDetails.author?.thumbnails?.[0]?.url) {
-      channelAvatar.src = videoDetails.author.thumbnails[0].url;
+    // Update avatar if details provide a better one (or if no card info was used)
+    if (channelAvatar && (!channelAvatarUrlFromCard || videoDetails.author?.thumbnails?.[0]?.url)) {
+      channelAvatar.src = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
     }
 
     if (subscriberCount) subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views';
     if (videoDescription) videoDescription.textContent = videoDetails.description || '';
 
-    // Update upload date only if needed (with null check)
+    // Update upload date only if needed (with null check and if not set from card)
     if (!uploadedDateFromCard && videoDetails.published && uploadDate) {
       uploadDate.textContent = videoDetails.published;
+    } else if (!uploadedDateFromCard && uploadDate) {
+      uploadDate.textContent = 'Unknown date'; // Set fallback if no info
     }
 
     // Load comments (passing the dynamically fetched elements)
@@ -130,6 +137,9 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement) {
 
     // Initialize YouTube player
     initializePlayer(videoId);
+
+    // Setup comments listener after player is ready
+    setupLoadMoreCommentsListener(); // Ensure this is called
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
@@ -175,24 +185,53 @@ function onYouTubeIframeAPIReady() {
 }
 
 function initializePlayer(videoId) {
-  // Get player container dynamically
   const playerContainer = document.getElementById('player');
-  if (!playerContainer) {
-    console.error("Player container element (#player) not found!");
+  const videoPlayerOverlay = document.getElementById('videoPlayer');
+  const customControls = document.getElementById('customControls'); // Get controls container
+
+  if (!playerContainer || !videoPlayerOverlay) {
+    console.error("Player container (#player) or overlay (#videoPlayer) element not found!");
     return;
   }
 
+  // Ensure the overlay container is visible
+  console.log("initializePlayer: Ensuring #videoPlayer overlay is visible.");
+  videoPlayerOverlay.classList.remove('hidden');
+  document.body.classList.add('overflow-hidden');
+
+  // --- Destroy old player and cleanup listeners ---
   if (ytPlayer) {
+    console.log("initializePlayer: Destroying previous player instance.");
     ytPlayer.destroy();
+    ytPlayer = null;
   }
-  // Disconnect previous observer if it exists
   if (playerResizeObserver && playerContainer) {
+    console.log("initializePlayer: Disconnecting previous ResizeObserver.");
     playerResizeObserver.unobserve(playerContainer);
     playerResizeObserver.disconnect();
     playerResizeObserver = null;
   }
+  // Remove keyboard listener if it was attached
+  if (keydownAttached) {
+    console.log("initializePlayer: Removing previous keydown listener.");
+    document.removeEventListener('keydown', handleKeydown);
+    keydownAttached = false;
+  }
+  // --- End destroy and cleanup ---
 
-  ytPlayer = new YT.Player(playerContainer, {
+  // --- Clear the player container ---
+  console.log("initializePlayer: Clearing inner HTML of #player container.");
+  playerContainer.innerHTML = ''; // The container now only has the ID 'player'
+
+  // --- Disable controls visually/functionally until ready ---
+  if (customControls) {
+    console.log("initializePlayer: Temporarily disabling custom controls.");
+    customControls.classList.add('pointer-events-none', 'opacity-50');
+  }
+
+  console.log(`initializePlayer: Creating new YT.Player for videoId: ${videoId}`);
+  // *** Use the ID string 'player' ***
+  ytPlayer = new YT.Player('player', {
     videoId: videoId,
     playerVars: {
       'playsinline': 1,
@@ -204,79 +243,78 @@ function initializePlayer(videoId) {
       'iv_load_policy': 3,
       'fs': 0, // Disable fullscreen button since we have our own
       'autoplay': 1, // Enable autoplay
-      'mute': 1, // Initially mute (required for autoplay in most browsers)
+      // 'mute': 1, // Let's try unmuted autoplay first now
       'enablejsapi': 1, // Enable JS API
       'origin': window.location.origin, // Set origin for security
       'widget_referrer': window.location.href, // Set referrer
-      'autohide': 1, // Hide YouTube controls
-      'onReady': onPlayerReady,
-      'onStateChange': onPlayerStateChange,
-      'onError': onPlayerError,
-      'onPlaybackQualityChange': onPlaybackQualityChange // New: Add quality change listener
+      'autohide': 1 // Hide YouTube controls
+      // Note: 'onReady', 'onStateChange', etc. are passed in the 'events' object now
     },
     events: {
-      'onReady': onPlayerReady,
+      'onReady': onPlayerReady, // This will re-enable controls/listeners
       'onStateChange': onPlayerStateChange,
       'onError': onPlayerError,
-      'onPlaybackQualityChange': onPlaybackQualityChange // New: Add quality change listener
+      'onPlaybackQualityChange': onPlaybackQualityChange
     }
   });
 
-  // Set up custom controls
-  setupCustomControls();
+  // Do NOT setup controls or listeners here anymore
 
-  // Set up ResizeObserver AFTER player is created
+  // Set up ResizeObserver AFTER player object is created
   if ('ResizeObserver' in window) {
+    console.log("initializePlayer: Setting up new ResizeObserver.");
     playerResizeObserver = new ResizeObserver(entries => {
       for (let entry of entries) {
         if (ytPlayer && typeof ytPlayer.setSize === 'function') {
           const { width, height } = entry.contentRect;
           // Only resize if dimensions are valid and player exists
-          if (width >= 200 && height >= 200) {
+          if (width > 0 && height > 0) { // Check > 0 instead of >= 200 initially
+            console.log(`ResizeObserver: Setting player size to ${width}x${height}`);
             ytPlayer.setSize(width, height);
           } else {
-            console.warn(`ResizeObserver: Calculated dimensions too small (${width}x${height}). Not resizing.`);
+            // This log might still appear initially, but hopefully size updates later
+            console.warn(`ResizeObserver: Calculated dimensions invalid (${width}x${height}). Not resizing yet.`);
           }
         }
       }
     });
-    // Observe the container div the player iframe lives in
     playerResizeObserver.observe(playerContainer);
   } else {
-    console.warn('ResizeObserver not supported. Player resizing might be suboptimal.');
-    // Fallback? Maybe call setSize initially in onPlayerReady?
+    console.warn('ResizeObserver not supported.');
   }
-
-  // Add keyboard listener only after player is ready and video is playing
-  document.addEventListener('keydown', handleKeydown);
 }
 
 function onPlayerReady(event) {
-  // Get elements dynamically
+  console.log("onPlayerReady: Player is ready. Setting up controls and listeners.");
   const playPauseBtn = document.getElementById('playPauseBtn');
+  const customControls = document.getElementById('customControls'); // Get controls container
 
-  // Player is ready
-  event.target.playVideo(); // Ensure video starts playing
-  event.target.unMute(); // Unmute after autoplay starts
-  updateVolumeUI(); // Assumes this gets elements dynamically now
-  if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Update the play button
+  // --- Re-enable controls ---
+  if (customControls) {
+    console.log("onPlayerReady: Re-enabling custom controls.");
+    customControls.classList.remove('pointer-events-none', 'opacity-50');
+  }
 
-  // Attempt to display markers now that player is ready
-  displaySponsorSegments(); // Assumes this gets elements dynamically
+  // --- Setup Controls and Key Listener NOW ---
+  setupCustomControls(); // Re-attach listeners inside this function
+  if (!keydownAttached) {
+    console.log("onPlayerReady: Attaching keydown listener.");
+    document.addEventListener('keydown', handleKeydown);
+    keydownAttached = true;
+  }
 
-  // Display chapters if available
-  displayChapters(videoChapters); // Pass stored chapters, assumes func gets elements dynamically
+  // Player is ready actions
+  event.target.unMute(); // Unmute after autoplay likely worked
+  updateVolumeUI();
+  if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
 
-  // Initial update of time display, progress, and current chapter
-  updatePlaybackProgress(); // Assumes this gets elements dynamically
-
-  // Start progress timer to continuously update
+  displaySponsorSegments();
+  displayChapters(videoChapters);
+  updatePlaybackProgress();
   startProgressTimer();
+  updateVolumeUI();
 
-  // Update volume UI
-  updateVolumeUI(); // Assumes this gets elements dynamically
-
-  // Get and display initial quality
+  // Get initial quality
   if (ytPlayer && typeof ytPlayer.getPlaybackQuality === 'function') {
     const qualityBtn = document.getElementById('qualityBtn'); // Get qualityBtn here
     const currentQuality = ytPlayer.getPlaybackQuality();
@@ -284,8 +322,7 @@ function onPlayerReady(event) {
     updateQualityDisplay(currentQuality, qualityBtn); // Pass qualityBtn
   }
 
-  // Add a fallback to ensure time updates work
-  // This helps with possible initialization timing issues
+  // Fallback time update
   setTimeout(() => {
     updatePlaybackProgress(); // Assumes this gets elements dynamically
     if (!progressTimer) {
@@ -855,8 +892,12 @@ function closeVideoPlayer() {
   videoChapters = [];
   if (qualityBtn) qualityBtn.textContent = 'Auto';
 
-  // Remove keyboard listener when closing
-  document.removeEventListener('keydown', handleKeydown);
+  // Remove keyboard listener if attached
+  if (keydownAttached) {
+    console.log("closeVideoPlayer: Removing keydown listener.");
+    document.removeEventListener('keydown', handleKeydown);
+    keydownAttached = false;
+  }
 }
 
 // Utility Functions
@@ -1262,6 +1303,30 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.value = queryParam; // Populate the search bar
     performSearch(); // Trigger the search automatically
   }
+
+  // --- Add IPC Listener ---
+  if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
+    console.log('app.js: Setting up IPC listener for video load requests.');
+    window.electronAPI.onVideoLoadRequest((videoId) => {
+      console.log(`app.js: IPC Listener CALLBACK triggered with videoId: ${videoId}`);
+      if (videoId && typeof videoId === 'string') {
+        // Call the global function to load the video
+        // Pass null for videoCardElement as it's not available here
+        console.log(`app.js: Calling window.loadAndDisplayVideo with ID: ${videoId}`);
+        try {
+          window.loadAndDisplayVideo(videoId, null);
+          console.log(`app.js: Successfully called window.loadAndDisplayVideo for ID: ${videoId}`);
+        } catch (error) {
+          console.error(`app.js: Error calling window.loadAndDisplayVideo for ID ${videoId}:`, error);
+        }
+      } else {
+        console.error('app.js: Received invalid video ID via IPC:', videoId);
+      }
+    });
+  } else {
+    console.warn('app.js: electronAPI or onVideoLoadRequest not found. IPC listener not set up.');
+  }
+  // --- End IPC Listener ---
 
   // Add other initializations if needed
   console.log('DOM Loaded. app.js initialized.');
