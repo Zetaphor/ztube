@@ -126,7 +126,6 @@ function initializePlayer(videoId) {
       for (let entry of entries) {
         if (ytPlayer && typeof ytPlayer.setSize === 'function') {
           const { width, height } = entry.contentRect;
-          console.log(`ResizeObserver detected size: ${width}x${height}`);
           // Only resize if dimensions are valid and player exists
           if (width >= 200 && height >= 200) {
             ytPlayer.setSize(width, height);
@@ -440,10 +439,8 @@ function updateVolumeUI() {
 
   // Update volume level color based on mute state
   if (isMuted) {
-    console.log("Volume UI: Muted, setting color to red"); // DEBUG
     volumeLevel.style.backgroundColor = '#ef4444'; // Tailwind red-500
   } else {
-    console.log("Volume UI: Unmuted, setting color to green"); // DEBUG
     volumeLevel.style.backgroundColor = '#38a169'; // Tailwind green-600 (original color)
   }
 }
@@ -545,10 +542,16 @@ function createVideoCard(video) {
   card.onclick = () => playVideo(video.id, card, channelAvatarUrl);
 
   // Get channel name with verified badge if applicable
-  const channelName = video.channel?.name || 'Unknown';
+  const channelNameText = video.channel?.name || 'Unknown'; // Use Text for display
+  const channelId = video.channel?.id; // Get channel ID
   const verifiedBadge = video.channel?.verified ?
     '<i class="fas fa-check-circle text-green-500 ml-1 text-xs" title="Verified Channel"></i>' :
     '';
+
+  // Construct channel link if ID exists
+  const channelLinkContent = channelId ?
+    `<a href="/channel/${channelId}" class="hover:text-green-500 truncate" onclick="event.stopPropagation();">${channelNameText}${verifiedBadge}</a>` :
+    `<span class="truncate">${channelNameText}${verifiedBadge}</span>`; // Non-clickable if no ID
 
   card.innerHTML = `
         <div class="video-thumbnail">
@@ -558,10 +561,10 @@ function createVideoCard(video) {
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm">${video.title || 'Untitled'}</h3>
             <div class="flex items-center mt-1">
-                <img src="${channelAvatarUrl}" alt="${channelName}" class="w-8 h-8 rounded-full mr-2 flex-shrink-0">
+                <img src="${channelAvatarUrl}" alt="${channelNameText}" class="w-8 h-8 rounded-full mr-2 flex-shrink-0">
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center text-zinc-300 text-xs truncate">
-                      ${channelName}${verifiedBadge}
+                    <div class="flex items-center text-zinc-300 text-xs">
+                      ${channelLinkContent}
                     </div>
                     <div class="video-meta text-zinc-400 text-xs mt-0.5">
                         <span>${views}</span>
@@ -588,13 +591,10 @@ async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
     }
 
     // --- Set avatar immediately from card data ---
-    console.log("Avatar URL from card:", channelAvatarUrlFromCard); // Log received URL
     if (channelAvatarUrlFromCard) {
       channelAvatar.src = channelAvatarUrlFromCard; // Use the passed URL
-      console.log("Set channelAvatar.src to (from card):", channelAvatar.src); // Log what was set
     } else {
       channelAvatar.src = '/img/default-avatar.svg'; // Fallback if not passed
-      console.log("Set channelAvatar.src to (default fallback):", channelAvatar.src); // Log fallback set
     }
     // --- End immediate avatar display ---
 
@@ -611,8 +611,10 @@ async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
 
     // Update video info UI
     videoTitle.textContent = videoDetails.title || 'Unknown';
+    // Set channel name text content directly
     channelName.textContent = videoDetails.author?.name || 'Unknown';
-    channelName.href = `/channel/${videoDetails.author?.id || ''}`;
+    // Set the href attribute for the channel link
+    channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author.id}` : '#'; // Link to channel page or '#' if no ID
 
     subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     viewCount.textContent = videoDetails.view_count || '0 views';

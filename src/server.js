@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 import { Innertube } from 'youtubei.js';
+import { YTNodes } from 'youtubei.js';
 
 // Load environment variables
 dotenv.config();
@@ -66,7 +67,7 @@ app.get('/api/video/:id', async (req, res) => {
     const { id } = req.params;
     const video = await youtube.getInfo(id);
     // Keep this log uncommented for now, it's very helpful for debugging structure issues
-    console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
+    // console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
 
     let chapters = [];
     let markersMap = null;
@@ -240,14 +241,105 @@ app.get('/api/comments/:id', async (req, res) => {
   }
 });
 
-// Get channel details
+// Get channel details API (remains for potential direct API use)
 app.get('/api/channel/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    // Add a simple validation check
+    if (!id || typeof id !== 'string') {
+      return res.status(400).json({ error: 'Invalid channel ID' });
+    }
     const channel = await youtube.getChannel(id);
-    res.json(channel);
+
+    // Basic check if channel data was found
+    if (!channel || !channel.header) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+
+    // Extract relevant data for the API response (optional, but good practice)
+    const channelData = {
+      id: id,
+      name: channel.header?.channel_header?.title?.text || channel.header?.title?.text || 'Unknown Channel',
+      avatar: channel.header?.channel_header?.author?.thumbnails?.[0]?.url || channel.header?.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg',
+      banner: channel.header?.banner?.thumbnails?.[0]?.url || null,
+      subscriber_count: channel.header?.subscriber_count?.text || channel.header?.subscribers?.text || '',
+      video_count: channel.header?.video_count?.text || '',
+      // You might want to add more fields as needed
+    };
+
+    res.json(channelData); // Send back curated data
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(`Channel API error for ID ${req.params.id}:`, error);
+    // Avoid sending detailed internal errors to the client
+    if (error.message?.includes('404')) {
+      res.status(404).json({ error: 'Channel not found or private' });
+    } else {
+      res.status(500).json({ error: 'Failed to retrieve channel details' });
+    }
+  }
+});
+
+// Channel Page Route
+app.get('/channel/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || typeof id !== 'string') {
+      return res.status(400).send('Invalid channel ID');
+    }
+    const channel = await youtube.getChannel(id);
+
+    // Prepare data for the template based on observed LTT structure
+    const header = channel.header;
+    const headerContent = header?.content; // Specific to PageHeader in LTT example
+    const microformat = channel.metadata; // LTT example had MicroformatData here
+
+    let channelName = 'Unknown Channel';
+    if (headerContent?.title?.text?.text) channelName = headerContent.title.text.text;
+    else if (microformat?.title) channelName = microformat.title;
+
+    let avatarUrl = '/img/default-avatar.svg'; // Default fallback
+    const potentialAvatars = [
+      headerContent?.image?.avatar?.image?.[0]?.url, // From PageHeader
+      microformat?.avatar?.[0]?.url // From MicroformatData
+    ];
+    avatarUrl = potentialAvatars.find(url => url && (url.startsWith('http://') || url.startsWith('https://'))) || avatarUrl;
+
+    let bannerUrl = null; // Default fallback
+    const potentialBanners = [
+      headerContent?.banner?.image?.[0]?.url, // From PageHeader Banner
+    ];
+    bannerUrl = potentialBanners.find(url => url && (url.startsWith('http://') || url.startsWith('https://'))) || bannerUrl;
+
+    // Extract counts from PageHeader structure
+    let subscriberCount = '';
+    let videoCount = '';
+    if (headerContent?.metadata?.metadata_rows?.[1]?.metadata_parts) {
+      subscriberCount = headerContent.metadata.metadata_rows[1].metadata_parts[0]?.text?.text || '';
+      videoCount = headerContent.metadata.metadata_rows[1].metadata_parts[1]?.text?.text || '';
+    }
+
+    // Final check logs
+    console.log('Final Extracted Name:', channelName);
+    console.log('Final Extracted Avatar URL:', avatarUrl);
+    console.log('Final Extracted Banner URL:', bannerUrl);
+    console.log('Final Extracted Subscriber Count:', subscriberCount);
+    console.log('Final Extracted Video Count:', videoCount);
+
+    const channelData = {
+      id: id,
+      name: channelName,
+      avatar: avatarUrl,
+      banner: bannerUrl,
+      subscriber_count: subscriberCount,
+      video_count: videoCount,
+    };
+
+    res.render('channel', { channel: channelData });
+
+  } catch (error) {
+    console.error(`Channel page error for ID ${req.params.id}:`, error);
+    // Send plain text error instead of rendering a non-existent view
+    res.status(500).send('Error: Could not load channel information.');
   }
 });
 
