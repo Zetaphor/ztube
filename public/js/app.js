@@ -143,13 +143,32 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     const videoDescription = document.getElementById('videoDescription');
     if (videoDescription) videoDescription.textContent = videoDetails.description || '';
 
-    // Update upload date (if not set from card)
-    // Re-fetch uploadDate element in case it wasn't fetched earlier
-    const uploadDateForDetails = document.getElementById('uploadDate');
-    if (!uploadedDateFromCard && videoDetails.published && uploadDateForDetails) {
-      uploadDateForDetails.textContent = videoDetails.published;
-    } else if (!uploadedDateFromCard && uploadDateForDetails) {
-      uploadDateForDetails.textContent = 'Unknown date';
+    // Update upload date (display relative and absolute date together)
+    const uploadDateForDetails = document.getElementById('uploadDate'); // Re-fetch element
+    const relativeDate = videoDetails.primary_info?.relative_date?.text;
+    const absoluteDate = videoDetails.primary_info?.published?.text;
+
+    if (uploadDateForDetails) { // Ensure element exists before manipulating
+      // Clear previous title attribute
+      uploadDateForDetails.removeAttribute('title');
+
+      // Construct display text/HTML
+      if (relativeDate && absoluteDate) {
+        // Use innerHTML to allow styling the absolute date
+        uploadDateForDetails.innerHTML = `${relativeDate} <span class="text-zinc-500">(${absoluteDate})</span>`;
+      } else if (relativeDate) {
+        uploadDateForDetails.textContent = relativeDate;
+      } else if (absoluteDate) {
+        uploadDateForDetails.textContent = absoluteDate;
+      } else if (uploadedDateFromCard) {
+        // Fallback: Date from card
+        uploadDateForDetails.textContent = uploadedDateFromCard;
+      } else {
+        // Final fallback
+        uploadDateForDetails.textContent = 'Unknown date';
+      }
+    } else {
+      console.warn("Upload date element (#uploadDate) not found in player overlay.");
     }
 
     // Load comments

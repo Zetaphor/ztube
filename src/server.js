@@ -144,6 +144,7 @@ app.get('/api/video/:id', async (req, res) => {
       durationSeconds: video.basic_info.duration || 0,
       is_live: video.basic_info.is_live,
       chapters: chapters,
+      primary_info: video.primary_info,
       secondary_info: video.secondary_info
     };
 
@@ -271,7 +272,7 @@ app.get('/api/video/:id/recommendations', async (req, res) => {
         title: video.title?.text || video.title || 'Untitled',
         duration: video.duration?.text || '0:00',
         viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
-        uploadedAt: video.published?.text || 'Unknown date',
+        uploadedAt: video.published_time_text?.text || video.published?.text || 'Unknown date',
         thumbnails: video.thumbnails || [],
         channel: {
           name: video.author?.name || 'Unknown',
