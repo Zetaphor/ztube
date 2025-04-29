@@ -37,12 +37,15 @@ function createWindow() {
     width: 1200,
     height: 800,
     icon: path.join(__dirname, 'public', 'img', 'icon.png'),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true
     }
   });
+
+  mainWindow.setMenuBarVisibility(false);
 
   // Wait a bit for the server to start before loading the app
   setTimeout(() => {
