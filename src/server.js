@@ -241,6 +241,54 @@ app.get('/api/comments/:id', async (req, res) => {
   }
 });
 
+// Get recommended videos
+app.get('/api/video/:id/recommendations', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const infoResponse = await youtube.getInfo(id);
+
+    // console.log('Full getInfo response for recommendations:', JSON.stringify(infoResponse, null, 2)); // Optional: Log the full structure
+
+    // --- Extract recommendations from watch_next_feed ---
+    let resultsNodes = [];
+    if (Array.isArray(infoResponse.watch_next_feed)) {
+      resultsNodes = infoResponse.watch_next_feed;
+      console.log('Found recommendations in infoResponse.watch_next_feed');
+    } else {
+      console.log(`Could not find recommendations array at infoResponse.watch_next_feed for ${id}`);
+    }
+
+    // Filter these nodes to get only video recommendations (e.g., CompactVideo)
+    const recommendedVideoNodes = resultsNodes.filter(node => node.is(YTNodes.CompactVideo) || node.constructor.name === 'CompactVideoRenderer') || [];
+
+    console.log(`Recommendations extraction: Found ${recommendedVideoNodes.length} potential video nodes for ${id}.`);
+
+    const recommendations = recommendedVideoNodes.map(video => {
+      // Adapt mapping based on the actual node type (CompactVideo)
+      return {
+        id: video.id,
+        title: video.title?.text || video.title || 'Untitled',
+        duration: video.duration?.text || '0:00',
+        viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+        uploadedAt: video.published?.text || 'Unknown date',
+        thumbnails: video.thumbnails || [],
+        channel: {
+          name: video.author?.name || 'Unknown',
+          avatar: video.author?.thumbnails || [],
+          verified: video.author?.is_verified || false,
+          id: video.author?.id || null
+        }
+      };
+    }).filter(v => v.id && v.title); // Ensure basic validity
+
+    res.json(recommendations);
+
+  } catch (error) {
+    console.error(`Recommendations error for video ${id}:`, error);
+    res.status(500).json({ error: `Failed to retrieve recommendations: ${error.message}` });
+  }
+});
+
 // Get channel details API (remains for potential direct API use)
 app.get('/api/channel/:id', async (req, res) => {
   try {

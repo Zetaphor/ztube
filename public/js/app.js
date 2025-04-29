@@ -129,6 +129,9 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     // Load comments (passing the dynamically fetched elements)
     await loadComments(videoId, null, commentsList, loadMoreComments);
 
+    // Fetch and display recommended videos
+    fetchRecommendedVideos(videoId);
+
     // Show video player
     videoPlayer.classList.remove('hidden');
 
@@ -869,6 +872,7 @@ function closeVideoPlayer() {
   const commentsList = document.getElementById('commentsList');
   const loadMoreComments = document.getElementById('loadMoreComments');
   const qualityBtn = document.getElementById('qualityBtn');
+  const recommendedContainer = document.getElementById('recommendedVideos')?.querySelector('.space-y-3'); // Get rec container
 
   // Disconnect observer when closing player
   if (playerResizeObserver && playerContainer) {
@@ -891,6 +895,7 @@ function closeVideoPlayer() {
   clearChapters(); // Assumes this gets its elements dynamically
   videoChapters = [];
   if (qualityBtn) qualityBtn.textContent = 'Auto';
+  if (recommendedContainer) recommendedContainer.innerHTML = ''; // Clear recommendations
 
   // Remove keyboard listener if attached
   if (keydownAttached) {
@@ -1290,6 +1295,90 @@ function updateQualityDisplay(quality, qualityBtn) { // Accept button as arg
   };
   qualityBtn.textContent = qualityMap[quality] || quality; // Fallback to raw quality name
 }
+
+// === Recommended Videos Functions ===
+async function fetchRecommendedVideos(videoId) {
+  const recommendedContainer = document.getElementById('recommendedVideos')?.querySelector('.space-y-3'); // Target the inner container
+  if (!recommendedContainer) {
+    console.error("Recommended videos container element not found!");
+    return;
+  }
+
+  recommendedContainer.innerHTML = '<p class="text-zinc-400 text-sm">Loading recommendations...</p>'; // Show loading state
+
+  try {
+    const response = await fetch(`/api/video/${videoId}/recommendations`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch recommendations: ${response.status}`);
+    }
+    const recommendations = await response.json();
+    displayRecommendedVideos(recommendations);
+  } catch (error) {
+    console.error('Failed to fetch or display recommendations:', error);
+    recommendedContainer.innerHTML = '<p class="text-red-500 text-sm">Failed to load recommendations.</p>';
+  }
+}
+
+function displayRecommendedVideos(videos) {
+  const recommendedContainer = document.getElementById('recommendedVideos')?.querySelector('.space-y-3'); // Target the inner container
+  if (!recommendedContainer) return;
+
+  recommendedContainer.innerHTML = ''; // Clear loading/error message
+
+  if (!videos || videos.length === 0) {
+    recommendedContainer.innerHTML = '<p class="text-zinc-400 text-sm">No recommendations found.</p>';
+    return;
+  }
+
+  videos.forEach(video => {
+    const card = createRecommendedVideoCard(video);
+    recommendedContainer.appendChild(card);
+  });
+}
+
+function createRecommendedVideoCard(video) {
+  const card = document.createElement('div');
+  card.className = 'recommended-video-card'; // Use the new CSS class
+
+  // Get thumbnail URL (prefer smaller ones if available)
+  const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
+
+  // Get duration
+  const duration = video.duration || '';
+
+  // Get view count
+  const views = video.viewCount || '';
+
+  // Get upload date
+  const uploadedAt = video.uploadedAt || '';
+
+  // Get channel name and ID
+  const channelNameText = video.channel?.name || 'Unknown';
+  const channelId = video.channel?.id;
+
+  // Make card clickable to load the video (pass null for element, as it's a recommendation card)
+  card.onclick = () => window.loadAndDisplayVideo(video.id, null);
+
+  card.innerHTML = `
+    <div class="recommended-thumbnail">
+      <img src="${thumbnail}" alt="${video.title}" loading="lazy" class="w-full h-auto object-cover rounded-md">
+      ${duration ? `<span class="recommended-duration">${duration}</span>` : ''}
+    </div>
+    <div class="recommended-details">
+      <h4 class="recommended-title">${video.title || 'Untitled'}</h4>
+      <div class="recommended-channel">
+        ${channelId ? `<a href="/channel/${channelId}" class="hover:text-green-500" onclick="event.stopPropagation();">${channelNameText}</a>` : `<span>${channelNameText}</span>`}
+      </div>
+      <div class="recommended-meta">
+        ${views ? `<span>${views}</span>` : ''}
+        ${uploadedAt ? `<span>${uploadedAt}</span>` : ''}
+      </div>
+    </div>
+  `;
+
+  return card;
+}
+// === End Recommended Videos Functions ===
 
 document.addEventListener('DOMContentLoaded', () => {
   // Check for search query in URL on page load (specifically for index page)
