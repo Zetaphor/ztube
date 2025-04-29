@@ -40,6 +40,7 @@ let progressTimer = null;
 let sponsorSegments = [];
 let videoChapters = [];
 let playerResizeObserver = null; // Add ResizeObserver state
+let keydownHandler = null; // Store the handler reference
 
 // Define colors for different segment types
 const segmentColors = {
@@ -135,6 +136,9 @@ function initializePlayer(videoId) {
     console.warn('ResizeObserver not supported. Player resizing might be suboptimal.');
     // Fallback? Maybe call setSize initially in onPlayerReady?
   }
+
+  // Add keyboard listener only after player is ready and video is playing
+  document.addEventListener('keydown', handleKeydown);
 }
 
 function onPlayerReady(event) {
@@ -702,6 +706,9 @@ function closeVideoPlayer() {
   clearSponsorMarkers();
   clearChapters(); // Clear chapters UI
   videoChapters = []; // Clear stored chapters
+
+  // Remove keyboard listener when closing
+  document.removeEventListener('keydown', handleKeydown);
 }
 
 // Utility Functions
@@ -806,4 +813,86 @@ function toggleChaptersAccordion() {
 
 function clearChapters() {
   // Implementation of clearChapters function
+}
+
+// --- Keyboard Shortcuts ---
+
+function handleKeydown(event) {
+  // Ignore if player isn't active or if typing in an input/textarea
+  if (!ytPlayer || !videoPlayer || videoPlayer.classList.contains('hidden') || ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+    return;
+  }
+
+  // Prevent default only for keys we handle explicitly
+  let preventDefault = false;
+
+  switch (event.key) {
+    case ' ': // Space bar
+      togglePlayPause();
+      preventDefault = true;
+      break;
+    case 'ArrowLeft':
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        const currentTime = ytPlayer.getCurrentTime() || 0;
+        ytPlayer.seekTo(Math.max(0, currentTime - 5), true); // Seek back 5s
+        preventDefault = true;
+        // Optional: Force UI update sooner
+        setTimeout(updatePlaybackProgress, 50);
+      }
+      break;
+    case 'ArrowRight':
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function' && typeof ytPlayer.getDuration === 'function') {
+        const currentTime = ytPlayer.getCurrentTime() || 0;
+        const duration = ytPlayer.getDuration() || 0;
+        ytPlayer.seekTo(Math.min(duration, currentTime + 5), true); // Seek forward 5s
+        preventDefault = true;
+        // Optional: Force UI update sooner
+        setTimeout(updatePlaybackProgress, 50);
+      }
+      break;
+    case 'ArrowUp':
+      if (ytPlayer && typeof ytPlayer.setVolume === 'function' && typeof ytPlayer.getVolume === 'function') {
+        const currentVolume = ytPlayer.getVolume();
+        ytPlayer.setVolume(Math.min(100, currentVolume + 5)); // Increase volume by 5
+        preventDefault = true;
+        // Update UI immediately
+        setTimeout(updateVolumeUI, 50);
+        // Also update the slider position
+        const newVolume = ytPlayer.getVolume() / 100;
+        volumeLevel.style.width = `${newVolume * 100}%`;
+      }
+      break;
+    case 'ArrowDown':
+      if (ytPlayer && typeof ytPlayer.setVolume === 'function' && typeof ytPlayer.getVolume === 'function') {
+        const currentVolume = ytPlayer.getVolume();
+        ytPlayer.setVolume(Math.max(0, currentVolume - 5)); // Decrease volume by 5
+        preventDefault = true;
+        // Update UI immediately
+        setTimeout(updateVolumeUI, 50);
+        // Also update the slider position
+        const newVolume = ytPlayer.getVolume() / 100;
+        volumeLevel.style.width = `${newVolume * 100}%`;
+      }
+      break;
+    // Add cases for 'm' (mute/unmute), 'f' (fullscreen), 't' (theater mode) if desired
+    case 't':
+    case 'T':
+      toggleTheaterMode();
+      preventDefault = true;
+      break;
+    case 'f':
+    case 'F':
+      toggleFullscreen();
+      preventDefault = true;
+      break;
+    case 'Escape':
+      closeVideoPlayer();
+      preventDefault = true; // Prevent any potential browser default for Escape
+      break;
+    // Add case for 'm' (mute/unmute) if desired
+  }
+
+  if (preventDefault) {
+    event.preventDefault();
+  }
 }
