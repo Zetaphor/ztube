@@ -8,7 +8,7 @@ const videoTitle = document.getElementById('videoTitle');
 const channelAvatar = document.getElementById('channelAvatar');
 const channelName = document.getElementById('channelName');
 const videoDescription = document.getElementById('videoDescription');
-const qualitySelect = document.getElementById('qualitySelect');
+// const qualitySelect = document.getElementById('qualitySelect'); // Removed - Element missing in HTML
 const subscriberCount = document.getElementById('subscriberCount');
 const viewCount = document.getElementById('viewCount');
 const uploadDate = document.getElementById('uploadDate');
@@ -55,11 +55,11 @@ searchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') performSearch();
 });
 closePlayer.addEventListener('click', closeVideoPlayer);
-qualitySelect.addEventListener('change', () => {
-  if (currentVideoId) {
-    updateVideoQuality(currentVideoId);
-  }
-});
+// qualitySelect.addEventListener('change', () => {
+//   if (currentVideoId) {
+//     updateVideoQuality(currentVideoId);
+//   }
+// });
 
 // Initialize YouTube player
 function onYouTubeIframeAPIReady() {
@@ -450,6 +450,7 @@ async function playVideo(videoId) {
   try {
     showLoading();
     currentVideoId = videoId;
+    document.body.classList.add('overflow-hidden'); // Prevent body scroll
 
     // Get video details
     const detailsResponse = await fetch(`/api/video/${videoId}`);
@@ -579,10 +580,12 @@ function closeVideoPlayer() {
     ytPlayer = null;
   }
   videoPlayer.classList.add('hidden');
+  document.body.classList.remove('overflow-hidden'); // Allow body scroll again
   currentVideoId = null;
   commentsNextPage = null;
   commentsList.innerHTML = '';
   loadMoreComments.style.display = 'none';
+  clearSponsorMarkers(); // Also clear markers when closing
 }
 
 // Utility Functions
@@ -708,3 +711,38 @@ function clearSponsorMarkers() {
   }
 }
 // --- End SponsorBlock Functions ---
+
+// --- Keyboard Shortcuts ---
+document.addEventListener('keydown', (event) => {
+  const isPlayerVisible = !videoPlayer.classList.contains('hidden');
+  const isInputFocused = event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA';
+
+  // Check if the video player is visible and the target isn't an input field
+  if (isPlayerVisible && ytPlayer && !isInputFocused) {
+    switch (event.key) {
+      case ' ': // Space bar
+        event.preventDefault(); // Prevent scrolling
+        togglePlayPause();
+        break;
+      case 'ArrowLeft':
+        event.preventDefault(); // Prevent default browser behavior
+        if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+          const currentTime = ytPlayer.getCurrentTime();
+          ytPlayer.seekTo(Math.max(0, currentTime - 5), true);
+          // Force immediate UI update after seeking
+          setTimeout(updatePlaybackProgress, 50);
+        }
+        break;
+      case 'ArrowRight':
+        event.preventDefault(); // Prevent default browser behavior
+        if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function' && typeof ytPlayer.getDuration === 'function') {
+          const currentTime = ytPlayer.getCurrentTime();
+          const duration = ytPlayer.getDuration();
+          ytPlayer.seekTo(Math.min(duration, currentTime + 5), true);
+          // Force immediate UI update after seeking
+          setTimeout(updatePlaybackProgress, 50);
+        }
+        break;
+    }
+  }
+});
