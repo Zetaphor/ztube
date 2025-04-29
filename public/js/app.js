@@ -511,7 +511,10 @@ function createVideoCard(video) {
   card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer';
 
   // Get thumbnail URL
-  const thumbnail = video.thumbnails?.[0]?.url || '';
+  const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
+
+  // Get channel avatar URL
+  const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
 
   // Get duration (already formatted from server)
   const duration = video.duration || '0:00';
@@ -525,26 +528,33 @@ function createVideoCard(video) {
   // Add data attribute
   card.dataset.uploadedat = uploadedAt;
 
-  // Update onclick to pass the card element
-  card.onclick = () => playVideo(video.id, card);
+  // Update onclick to pass the card element AND the avatar URL
+  card.onclick = () => playVideo(video.id, card, channelAvatarUrl);
 
   // Get channel name with verified badge if applicable
   const channelName = video.channel?.name || 'Unknown';
   const verifiedBadge = video.channel?.verified ?
-    '<i class="fas fa-check-circle text-green-500 ml-1" title="Verified Channel"></i>' :
+    '<i class="fas fa-check-circle text-green-500 ml-1 text-xs" title="Verified Channel"></i>' :
     '';
 
   card.innerHTML = `
         <div class="video-thumbnail">
-            <img src="${thumbnail}" alt="${video.title}" loading="lazy">
+            <img src="${thumbnail}" alt="${video.title}" loading="lazy" class="w-full h-full object-cover">
             <span class="video-duration">${duration}</span>
         </div>
-        <div class="p-4">
-            <h3 class="font-semibold text-zinc-100 line-clamp-2">${video.title || 'Untitled'}</h3>
-            <div class="video-meta mt-2">
-                <span class="flex items-center">${channelName}${verifiedBadge}</span>
-                <span>${views}</span>
-                <span>${uploadedAt}</span>
+        <div class="p-3">
+            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm">${video.title || 'Untitled'}</h3>
+            <div class="flex items-center mt-1">
+                <img src="${channelAvatarUrl}" alt="${channelName}" class="w-8 h-8 rounded-full mr-2 flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center text-zinc-300 text-xs truncate">
+                      ${channelName}${verifiedBadge}
+                    </div>
+                    <div class="video-meta text-zinc-400 text-xs mt-0.5">
+                        <span>${views}</span>
+                        <span>${uploadedAt}</span>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -552,7 +562,7 @@ function createVideoCard(video) {
   return card;
 }
 
-async function playVideo(videoId, videoCardElement) {
+async function playVideo(videoId, videoCardElement, channelAvatarUrlFromCard) {
   try {
     showLoading();
     currentVideoId = videoId;
@@ -563,7 +573,17 @@ async function playVideo(videoId, videoCardElement) {
     if (uploadedDateFromCard) {
       uploadDate.textContent = uploadedDateFromCard;
     }
-    // --- End immediate date display ---
+
+    // --- Set avatar immediately from card data ---
+    console.log("Avatar URL from card:", channelAvatarUrlFromCard); // Log received URL
+    if (channelAvatarUrlFromCard) {
+      channelAvatar.src = channelAvatarUrlFromCard; // Use the passed URL
+      console.log("Set channelAvatar.src to (from card):", channelAvatar.src); // Log what was set
+    } else {
+      channelAvatar.src = '/img/default-avatar.svg'; // Fallback if not passed
+      console.log("Set channelAvatar.src to (default fallback):", channelAvatar.src); // Log fallback set
+    }
+    // --- End immediate avatar display ---
 
     // Get video details
     const detailsResponse = await fetch(`/api/video/${videoId}`);
@@ -581,15 +601,26 @@ async function playVideo(videoId, videoCardElement) {
     channelName.textContent = videoDetails.author?.name || 'Unknown';
     channelName.href = `/channel/${videoDetails.author?.id || ''}`;
 
-    if (videoDetails.author?.thumbnails && videoDetails.author.thumbnails.length > 0) {
-      channelAvatar.src = videoDetails.author.thumbnails[0].url;
-    } else {
-      channelAvatar.src = '';
+    // Optionally, update avatar *again* if details API provides a (potentially better) one
+    // This overrides the one from the card if the details API has one.
+    const avatarFromDetails = videoDetails.author?.thumbnails?.[0]?.url;
+    console.log("Avatar URL from details API:", avatarFromDetails); // Log details API URL
+    /* REMOVED THIS BLOCK
+    if (avatarFromDetails) {
+      channelAvatar.src = avatarFromDetails;
+      console.log("Updated channelAvatar.src to (from details API):", channelAvatar.src); // Log update
     }
+    */
+    // else keep the one from the card or the default
 
     subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     viewCount.textContent = videoDetails.view_count || '0 views';
     videoDescription.textContent = videoDetails.description || '';
+
+    // Update upload date ONLY if not set from card (or if details are more accurate)
+    if (!uploadedDateFromCard && videoDetails.published) {
+      uploadDate.textContent = videoDetails.published;
+    }
 
     // Load comments
     await loadComments(videoId);
