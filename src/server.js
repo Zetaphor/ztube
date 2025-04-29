@@ -65,6 +65,7 @@ app.get('/api/video/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const video = await youtube.getInfo(id);
+    console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
 
     // Debug logging
     console.log('Raw video info:', video.basic_info);
@@ -74,12 +75,14 @@ app.get('/api/video/:id', async (req, res) => {
     const videoDetails = {
       id: video.basic_info.id,
       title: video.basic_info.title?.text || video.basic_info.title,
-      description: video.basic_info.description || '',
+      description: video.secondary_info?.description?.text || video.basic_info.description || '',
       view_count: typeof video.basic_info.view_count === 'number'
         ? formatViewCount(video.basic_info.view_count)
         : video.basic_info.view_count?.text || '0 views',
       like_count: video.basic_info.like_count?.text || video.basic_info.like_count,
-      published: video.basic_info.publish_date || video.basic_info.published?.text || video.basic_info.published || 'Unknown date',
+
+      // Revert to using the relative date text from basic_info, which works in search
+      published: video.basic_info.published?.text || 'Unknown date',
       author: {
         id: video.basic_info.channel?.id,
         name: video.basic_info.channel?.name?.text || video.basic_info.channel?.name,

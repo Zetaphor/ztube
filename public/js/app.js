@@ -408,7 +408,7 @@ function displayResults(results) {
 function createVideoCard(video) {
   const card = document.createElement('div');
   card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer';
-  card.onclick = () => playVideo(video.id);
+  card.onclick = () => playVideo(video.id, video.uploadedAt);
 
   // Get thumbnail URL
   const thumbnail = video.thumbnails?.[0]?.url || '';
@@ -446,7 +446,7 @@ function createVideoCard(video) {
   return card;
 }
 
-async function playVideo(videoId) {
+async function playVideo(videoId, uploadedAt) {
   try {
     showLoading();
     currentVideoId = videoId;
@@ -455,6 +455,7 @@ async function playVideo(videoId) {
     // Get video details
     const detailsResponse = await fetch(`/api/video/${videoId}`);
     const videoDetails = await detailsResponse.json();
+    console.log('Video Details:', videoDetails);
 
     // Update video info UI
     videoTitle.textContent = videoDetails.title || 'Unknown';
@@ -469,7 +470,7 @@ async function playVideo(videoId) {
 
     subscriberCount.textContent = videoDetails.author?.subscriber_count || '';
     viewCount.textContent = videoDetails.view_count || '0 views';
-    uploadDate.textContent = videoDetails.published || '';
+    uploadDate.textContent = uploadedAt || 'Unknown date';
     videoDescription.textContent = videoDetails.description || '';
 
     // Load comments
