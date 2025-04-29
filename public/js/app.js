@@ -3,42 +3,6 @@ const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
 const content = document.getElementById('content');
 
-// Remove definitions for elements inside the player overlay
-/*
-const videoPlayer = document.getElementById('videoPlayer');
-const playerContainer = document.getElementById('player');
-const videoAreaContainer = document.getElementById('videoAreaContainer');
-const customControls = document.getElementById('customControls');
-const closePlayer = document.getElementById('closePlayer'); // Keep this? No, get it inside closeVideoPlayer
-const videoTitle = document.getElementById('videoTitle');
-const channelAvatar = document.getElementById('channelAvatar');
-const channelName = document.getElementById('channelName');
-const videoDescription = document.getElementById('videoDescription');
-const subscriberCount = document.getElementById('subscriberCount');
-const viewCount = document.getElementById('viewCount');
-const uploadDate = document.getElementById('uploadDate');
-const commentsList = document.getElementById('commentsList');
-const loadMoreComments = document.getElementById('loadMoreComments');
-const chaptersAccordion = document.getElementById('chaptersAccordion');
-const chaptersHeader = document.getElementById('chaptersHeader');
-const currentChapterTitle = document.getElementById('currentChapterTitle');
-const chapterToggleIcon = document.getElementById('chapterToggleIcon');
-const chaptersList = document.getElementById('chaptersList');
-const playPauseBtn = document.getElementById('playPauseBtn');
-const progressBar = document.getElementById('progressBar');
-const progress = document.getElementById('progress');
-const currentTime = document.getElementById('currentTime');
-const duration = document.getElementById('duration');
-const volumeBtn = document.getElementById('volumeBtn');
-const volumeSlider = document.getElementById('volumeSlider');
-const volumeLevel = document.getElementById('volumeLevel');
-const playbackSpeedBtn = document.getElementById('playbackSpeedBtn');
-const speedOptions = document.getElementById('speedOptions');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
-const theaterModeBtn = document.getElementById('theaterModeBtn');
-const qualityBtn = document.getElementById('qualityBtn');
-*/
-
 // Global variables / State
 let currentVideoId = null;
 let commentsNextPage = null;
@@ -53,8 +17,6 @@ let keydownAttached = false; // Track if the listener is attached
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
-  // REMOVED bulk getElementById calls from here
-
   const videoPlayer = document.getElementById('videoPlayer'); // Keep this check early
   if (!videoPlayer) {
     console.error('Video player element not found!');
