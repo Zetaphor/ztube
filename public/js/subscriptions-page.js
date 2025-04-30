@@ -3,6 +3,33 @@
 
 import { showError, showLoading, hideLoading } from './utils.js';
 
+// === Helper to Update Bookmark Icon State ===
+function updateBookmarkIconState(cardElement) {
+  const bookmarkBtn = cardElement.querySelector('.bookmark-btn');
+  const bookmarkIcon = bookmarkBtn?.querySelector('i');
+  const videoId = cardElement.dataset.videoId;
+
+  if (bookmarkBtn && bookmarkIcon && videoId && typeof window.isVideoInDefaultPlaylist === 'function') {
+    try {
+      if (window.isVideoInDefaultPlaylist(videoId)) {
+        bookmarkIcon.className = 'fas fa-bookmark'; // Solid bookmark
+        bookmarkBtn.title = "Remove from Watch Later";
+        bookmarkBtn.classList.add('visible'); // Make visible
+      } else {
+        bookmarkIcon.className = 'far fa-bookmark'; // Empty bookmark
+        bookmarkBtn.title = "Add to Watch Later";
+        bookmarkBtn.classList.remove('visible'); // Ensure hidden/default state
+      }
+    } catch (error) {
+      console.error(`Error updating bookmark state for ${videoId} in subscriptions-page.js:`, error);
+      // Keep default state on error
+      bookmarkIcon.className = 'far fa-bookmark';
+      bookmarkBtn.title = "Add to Watch Later";
+      bookmarkBtn.classList.remove('visible');
+    }
+  }
+}
+
 // Tab elements and content containers
 const videosTab = document.getElementById('videosTab');
 const shortsTab = document.getElementById('shortsTab');
@@ -24,6 +51,37 @@ const sentinelId = 'video-lazy-load-sentinel';
 // --- End Lazy Loading Variables ---
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- Setup Event Listeners Early ---
+  const updateAllSubscriptionBookmarkIcons = () => {
+    // Target only cards within the subscription videos container
+    const cards = videosContent?.querySelectorAll('.video-card') || [];
+    console.log(`[Subscriptions] Found ${cards.length} cards to update bookmark status.`);
+    cards.forEach(card => {
+      if (card.dataset.videoId) {
+        updateBookmarkIconState(card);
+      }
+    });
+    // TODO: Update shorts cards if/when implemented
+  };
+
+  // Listen for the event dispatched when default playlist info is loaded
+  document.addEventListener('defaultPlaylistLoaded', () => {
+    console.log("[Subscriptions] Received defaultPlaylistLoaded event. Updating icons.");
+    updateAllSubscriptionBookmarkIcons();
+  });
+
+  // Listen for a custom event that signals UI might need an update
+  document.addEventListener('uiNeedsBookmarkUpdate', () => {
+    console.log("[Subscriptions] Received uiNeedsBookmarkUpdate event. Updating icons.");
+    // Check if data is ready before updating
+    if (window.defaultPlaylistInfoLoaded) {
+      updateAllSubscriptionBookmarkIcons();
+    } else {
+      console.log("[Subscriptions] Default playlist info not yet loaded, skipping immediate update.");
+    }
+  });
+  // --- End Event Listener Setup ---
+
   // Add Tab Listeners
   videosTab?.addEventListener('click', () => switchTab('videos'));
   shortsTab?.addEventListener('click', () => switchTab('shorts'));
@@ -330,7 +388,7 @@ function createSubscriptionVideoCard(video) {
                      <i class="fas fa-plus"></i>
                  </button>
                  <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
-                     <i class="far fa-bookmark"></i> <!-- Default state -->
+                     <i class="far fa-bookmark"></i> <!-- Default empty state -->
                  </button>
             </div>
             <!-- End Thumbnail Hover Icons -->
@@ -364,17 +422,6 @@ function createSubscriptionVideoCard(video) {
   card.dataset.thumbnailUrl = video.thumbnailUrl || '/img/default-video.png';
 
   if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
-    // Set initial icon state and visibility
-    if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) {
-      bookmarkIcon.classList.add('fas'); // Just make it solid
-      bookmarkBtn.title = "Remove from Watch Later";
-      bookmarkBtn.classList.add('visible'); // Make visible
-    } else {
-      bookmarkIcon.className = 'far fa-bookmark'; // Ensure default classes
-      bookmarkBtn.title = "Add to Watch Later";
-      bookmarkBtn.classList.remove('visible'); // Ensure hidden
-    }
-
     bookmarkBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const currentIconClass = bookmarkIcon.className;

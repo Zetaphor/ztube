@@ -14,6 +14,9 @@ let defaultPlaylistVideoIds = new Set();
 let defaultPlaylistInfoLoaded = false;
 let defaultPlaylistLoadPromise = null;
 
+// --- Expose flag globally ---
+window.defaultPlaylistInfoLoaded = false;
+
 // --- Create Modal Structure (once) ---
 function ensureModalExists() {
   if (modalElement) return; // Already created
@@ -81,20 +84,27 @@ async function fetchAndStoreDefaultPlaylistInfo() {
         if (!detailsResponse.ok) throw new Error(`Failed to fetch details for playlist ${defaultPlaylistId}`);
         const playlistDetails = await detailsResponse.json();
 
-        defaultPlaylistVideoIds = new Set(playlistDetails.videos.map(v => v.videoId));
+        console.log(`Playlist details:`, playlistDetails.videos);
+
+        defaultPlaylistVideoIds = new Set(playlistDetails.videos.map(v => v.video_id));
         console.log(`Loaded ${defaultPlaylistVideoIds.size} video IDs from default playlist.`);
         defaultPlaylistInfoLoaded = true;
+        window.defaultPlaylistInfoLoaded = true; // Update global flag
         document.dispatchEvent(new CustomEvent('defaultPlaylistLoaded')); // Notify listeners
       } else {
         console.warn("No default playlist found.");
         // Keep defaultPlaylistId null and set as loaded
         defaultPlaylistInfoLoaded = true;
+        window.defaultPlaylistInfoLoaded = true; // Update global flag
+        document.dispatchEvent(new CustomEvent('defaultPlaylistLoaded')); // Notify listeners
       }
     } catch (error) {
       console.error("Error fetching default playlist info:", error);
       // Consider setting loaded to true even on error to prevent retries?
       // Or maybe allow retry on next modal open? For now, mark as loaded.
       defaultPlaylistInfoLoaded = true; // Prevent hammering API on errors
+      window.defaultPlaylistInfoLoaded = true; // Update global flag
+      document.dispatchEvent(new CustomEvent('defaultPlaylistLoaded')); // Notify listeners even on error
     } finally {
       defaultPlaylistLoadPromise = null; // Clear promise regardless of outcome
     }
@@ -114,6 +124,7 @@ async function fetchAndStoreDefaultPlaylistInfo() {
 function isVideoInDefaultPlaylist(videoId) {
   if (!defaultPlaylistInfoLoaded) {
     console.warn("isVideoInDefaultPlaylist called before default playlist info loaded.");
+    return false; // Return false if not loaded yet
   }
   return defaultPlaylistId !== null && defaultPlaylistVideoIds.has(videoId);
 }
@@ -131,6 +142,10 @@ async function toggleVideoInDefaultPlaylist(videoData) {
   }
 
   const { videoId } = videoData;
+  if (!videoId) { // Added check for videoId early
+    console.error("toggleVideoInDefaultPlaylist called with invalid videoData:", videoData);
+    throw new Error("Invalid video data provided for toggle.");
+  }
   const currentlyInPlaylist = defaultPlaylistVideoIds.has(videoId);
 
   try {

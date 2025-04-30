@@ -18,6 +18,33 @@ const videoPlayerToggleWatchLaterBtn = document.getElementById('videoPlayerToggl
 let currentVideoId = null;
 let currentVideoDetailsForPlaylist = {}; // Store details needed for adding to playlist
 
+// === Helper to Update Bookmark Icon State ===
+function updateBookmarkIconState(cardElement) {
+  const bookmarkBtn = cardElement.querySelector('.bookmark-btn');
+  const bookmarkIcon = bookmarkBtn?.querySelector('i');
+  const videoId = cardElement.dataset.videoId;
+
+  if (bookmarkBtn && bookmarkIcon && videoId && typeof window.isVideoInDefaultPlaylist === 'function') {
+    try {
+      if (window.isVideoInDefaultPlaylist(videoId)) {
+        bookmarkIcon.className = 'fas fa-bookmark'; // Solid bookmark
+        bookmarkBtn.title = "Remove from Watch Later";
+        bookmarkBtn.classList.add('visible'); // Make visible
+      } else {
+        bookmarkIcon.className = 'far fa-bookmark'; // Empty bookmark
+        bookmarkBtn.title = "Add to Watch Later";
+        bookmarkBtn.classList.remove('visible'); // Ensure hidden/default state
+      }
+    } catch (error) {
+      console.error(`Error updating bookmark state for ${videoId} in app.js:`, error);
+      // Keep default state on error
+      bookmarkIcon.className = 'far fa-bookmark';
+      bookmarkBtn.title = "Add to Watch Later";
+      bookmarkBtn.classList.remove('visible');
+    }
+  }
+}
+
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
@@ -302,6 +329,8 @@ async function performSearch() {
       const data = await response.json();
       // Display results within the main content area
       displayResults(data, mainContentArea);
+      // Update bookmark icons after displaying results
+      document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
     } catch (error) {
       console.error('Search error:', error);
       // Display error within the main content area, replacing its content
@@ -399,7 +428,7 @@ function createVideoCard(video) {
                     <i class="fas fa-plus"></i>
                 </button>
                 <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
-                    <i class="far fa-bookmark"></i> <!-- Default state -->
+                    <i class="far fa-bookmark"></i> <!-- Default empty state -->
                 </button>
             </div>
             <!-- End Thumbnail Hover Icons -->
@@ -432,16 +461,8 @@ function createVideoCard(video) {
   const bookmarkIcon = bookmarkBtn?.querySelector('i');
 
   if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
-    // Set initial icon state and visibility
-    if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) {
-      bookmarkIcon.classList.add('fas'); // Just make it solid
-      bookmarkBtn.title = "Remove from Watch Later";
-      bookmarkBtn.classList.add('visible'); // Make visible
-    } else {
-      bookmarkIcon.className = 'far fa-bookmark'; // Ensure default classes
-      bookmarkBtn.title = "Add to Watch Later";
-      bookmarkBtn.classList.remove('visible'); // Ensure hidden
-    }
+    // Remove initial state setting here
+    // if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) { ... }
 
     bookmarkBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -531,6 +552,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (queryParam && searchInput && content) {
     searchInput.value = queryParam;
     performSearch();
+  } else {
+    // If no search query, maybe update icons for initially loaded content (if any)
+    document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
   }
 
   // Add IPC Listener (Remains in app.js)
@@ -554,6 +578,37 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.warn('app.js: electronAPI or onVideoLoadRequest not found. IPC listener not set up.');
   }
+
+  // --- Event Listener for Updating Bookmark Icons ---
+  const updateAllVisibleBookmarkIcons = () => {
+    // Select only cards directly within the main content grid managed by app.js/search
+    const cards = document.querySelectorAll('#main-content > main > #content > .video-card');
+    console.log(`[app.js] Found ${cards.length} video cards in #content to update bookmark status.`);
+    cards.forEach(card => {
+      if (card.dataset.videoId) {
+        updateBookmarkIconState(card);
+      }
+    });
+  };
+
+  // Listen for the event dispatched when default playlist info is loaded
+  document.addEventListener('defaultPlaylistLoaded', () => {
+    console.log("[app.js] Received defaultPlaylistLoaded event. Updating icons in #content.");
+    updateAllVisibleBookmarkIcons();
+  });
+
+  // Listen for a custom event that signals UI might need an update (e.g., after search results display)
+  document.addEventListener('uiNeedsBookmarkUpdate', () => {
+    console.log("[app.js] Received uiNeedsBookmarkUpdate event. Updating icons.");
+    // This check ensures we don't try to update before the data is ready
+    if (window.defaultPlaylistInfoLoaded) {
+      updateAllVisibleBookmarkIcons();
+    } else {
+      console.log("[app.js] Default playlist info not yet loaded, skipping immediate update.");
+      // The 'defaultPlaylistLoaded' listener will handle it later.
+    }
+  });
+  // --- End Event Listener ---
 });
 
 // === Subscribe/Unsubscribe Logic ===
