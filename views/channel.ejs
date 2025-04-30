@@ -58,65 +58,65 @@
         </div>
       </nav>
 
-      <!-- Channel Specific Main Content -->
-      <main class="container mx-auto mt-4 flex-grow p-4">
-        <!-- Channel Header -->
-        <div class="channel-banner rounded-t-lg" style="background-image: url('<%= channel.banner %>');"></div>
-        <div class="bg-zinc-800 p-4 rounded-b-lg shadow-md mb-6">
-          <div class="flex flex-col sm:flex-row items-center">
-            <img src="<%= channel.avatar %>" alt="<%= channel.name %>"
-              class="w-24 h-24 rounded-full border-4 border-zinc-900 -mt-12 sm:mr-6 mb-4 sm:mb-0">
-            <div class="flex-1 text-center sm:text-left">
-              <h1 class="text-3xl font-bold text-zinc-100">
-                <%= channel.name %>
-              </h1>
-              <p class="text-zinc-400 mt-1">
-                <%= channel.subscriber_count %>
-              </p>
-              <% if (channel.video_count) { %>
-                <p class="text-zinc-400 text-sm">
-                  <%= channel.video_count %> videos
-                </p>
-                <% } %>
-            </div>
-            <!-- Add Subscribe button or other actions here -->
-          </div>
-        </div>
-
-        <!-- Channel Content (Tabs, Videos, Playlists, etc.) -->
-        <div>
-          <!-- Tabs (Example Structure) -->
-          <div class="border-b border-zinc-700 mb-4">
-            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-              <!-- Current: "border-green-500 text-green-500", Default: "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300" -->
-              <a href="#"
-                class="border-green-500 text-green-500 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
-                aria-current="page">
-                Videos
-              </a>
-              <a href="#"
-                class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-                Playlists
-              </a>
-              <a href="#"
-                class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-                About
-              </a>
-              <!-- Add more tabs as needed -->
-            </nav>
-          </div>
-
-          <!-- Content Area (Load dynamically) -->
-          <div id="channelContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <!-- Videos/Playlists will be loaded here by JavaScript -->
-            <p class="col-span-full text-center text-zinc-500 py-8">Loading content...</p>
-          </div>
-        </div>
-      </main>
-      <!-- End Channel Specific Main Content -->
-
-      <!-- Shared Video Player Partial -->
+      <!-- Shared Video Player Partial - Moved outside main -->
       <%- include('partials/videoPlayer') %>
+
+        <!-- Channel Specific Main Content -->
+        <main class="container mx-auto mt-4 flex-grow p-4">
+          <!-- Channel Header -->
+          <div class="channel-banner rounded-t-lg" style="background-image: url('<%= channel.banner %>');"></div>
+          <div class="bg-zinc-800 p-4 rounded-b-lg shadow-md mb-6">
+            <div class="flex flex-col sm:flex-row items-center">
+              <img src="<%= channel.avatar %>" alt="<%= channel.name %>"
+                class="w-24 h-24 rounded-full border-4 border-zinc-900 -mt-12 sm:mr-6 mb-4 sm:mb-0">
+              <div class="flex-1 text-center sm:text-left">
+                <h1 class="text-3xl font-bold text-zinc-100">
+                  <%= channel.name %>
+                </h1>
+                <p class="text-zinc-400 mt-1">
+                  <%= channel.subscriber_count %>
+                </p>
+                <% if (channel.video_count) { %>
+                  <p class="text-zinc-400 text-sm">
+                    <%= channel.video_count %> videos
+                  </p>
+                  <% } %>
+              </div>
+              <!-- Add Subscribe button or other actions here -->
+            </div>
+          </div>
+
+          <!-- Channel Content (Tabs, Videos, Playlists, etc.) -->
+          <div>
+            <!-- Tabs (Example Structure) -->
+            <div class="border-b border-zinc-700 mb-4">
+              <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <!-- Current: "border-green-500 text-green-500", Default: "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300" -->
+                <a href="#"
+                  class="border-green-500 text-green-500 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
+                  aria-current="page">
+                  Videos
+                </a>
+                <a href="#"
+                  class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                  Playlists
+                </a>
+                <a href="#"
+                  class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                  About
+                </a>
+                <!-- Add more tabs as needed -->
+              </nav>
+            </div>
+
+            <!-- Content Area (Load dynamically) -->
+            <div id="channelContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <!-- Videos/Playlists will be loaded here by JavaScript -->
+              <p class="col-span-full text-center text-zinc-500 py-8">Loading content...</p>
+            </div>
+          </div>
+        </main>
+        <!-- End Channel Specific Main Content -->
     </div> <!-- End #main-content -->
   </div> <!-- End flex container -->
 

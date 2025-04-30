@@ -18,8 +18,8 @@ let currentVideoId = null;
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
   console.log(`app.js: window.loadAndDisplayVideo called for ${videoId}`);
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
-  const mainIndexContent = document.getElementById('content'); // Grid on index page
-  const mainChannelContent = document.getElementById('channelContent'); // Grid on channel page
+  const mainIndexContentGrid = document.getElementById('content'); // Grid on index page
+  const mainChannelPageContentContainer = document.querySelector('#main-content > main'); // The <main> tag on channel page
 
   if (!videoPlayerContainer) {
     showError('Video player container not found.');
@@ -30,9 +30,13 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     showLoading();
     currentVideoId = videoId;
 
-    // Hide main content grid and show player container
-    if (mainIndexContent) mainIndexContent.classList.add('hidden');
-    if (mainChannelContent) mainChannelContent.classList.add('hidden');
+    // Hide main content grid/container and show player container
+    if (mainIndexContentGrid) {
+      mainIndexContentGrid.classList.add('hidden');
+    } else if (mainChannelPageContentContainer) {
+      // Hide the entire <main> element on the channel page
+      mainChannelPageContentContainer.classList.add('hidden');
+    }
     videoPlayerContainer.classList.remove('hidden');
 
     // --- Get and display date from card immediately ---
@@ -305,15 +309,20 @@ async function playVideo(videoId, videoCardElement) {
 function closeVideoPlayer() {
   console.log("app.js: closeVideoPlayer called");
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
-  const mainIndexContent = document.getElementById('content'); // Grid on index page
-  const mainChannelContent = document.getElementById('channelContent'); // Grid on channel page
+  const mainIndexContentGrid = document.getElementById('content'); // Grid on index page
+  const mainChannelPageContentContainer = document.querySelector('#main-content > main'); // The <main> tag on channel page
 
   Player.destroyPlayer(); // Call the player module's destroy function
 
-  // Hide player container and show main content grid
+  // Hide player container and show main content grid/container
   if (videoPlayerContainer) videoPlayerContainer.classList.add('hidden');
-  if (mainIndexContent) mainIndexContent.classList.remove('hidden');
-  if (mainChannelContent) mainChannelContent.classList.remove('hidden');
+
+  if (mainIndexContentGrid) {
+    mainIndexContentGrid.classList.remove('hidden');
+  } else if (mainChannelPageContentContainer) {
+    // Show the <main> element again on the channel page
+    mainChannelPageContentContainer.classList.remove('hidden');
+  }
 
   // Clear app-specific state related to the video
   currentVideoId = null;
