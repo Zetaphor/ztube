@@ -109,7 +109,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     if (uploadDateForDetails) {
       uploadDateForDetails.removeAttribute('title');
       if (relativeDate && absoluteDate) {
-        uploadDateForDetails.innerHTML = `${relativeDate} <span class="text-zinc-500">(${absoluteDate})</span>`;
+        uploadDateForDetails.innerHTML = `${relativeDate} • ${absoluteDate}`;
       } else if (relativeDate) {
         uploadDateForDetails.textContent = relativeDate;
       } else if (absoluteDate) {
