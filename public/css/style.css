@@ -536,3 +536,21 @@
   /* Ensure button has minimum width */
   padding: 4px 8px;
 }
+
+/* Sidebar Styles */
+#sidebar {
+  /* Tailwind classes handle most of this (w-64, bg-zinc-800, fixed, etc.) */
+  /* Add specific scrollbar styling if needed, similar to #commentsList */
+}
+
+#main-content {
+  /* Tailwind class ml-16 handles the margin */
+  /* Ensure vertical scrolling if content exceeds viewport */
+  overflow-y: auto;
+}
+
+/* Adjust main container padding to account for sticky nav within #main-content */
+#main-content>main {
+  /* Removed pt-20 from index.ejs, manage padding here if needed */
+  /* padding-top: 4rem; /* Example: Adjust based on nav height */
+}
