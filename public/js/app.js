@@ -3,7 +3,6 @@ import * as SponsorBlock from './sponsorblock.js';
 import * as Player from './player.js';
 import * as Recommended from './recommended.js';
 import * as Comments from './comments.js';
-import * as Subscriptions from './subscriptions.js';
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
@@ -345,10 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.value = queryParam;
     performSearch();
   }
-
-  // Initialize Subscriptions module (if needed on startup)
-  // This will currently just log a warning and show placeholder text
-  Subscriptions.initSubscriptions();
 
   // Add IPC Listener (Remains in app.js)
   if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {

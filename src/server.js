@@ -14,6 +14,8 @@ import * as HiddenContentRepo from './db/hiddenContentRepository.js'; // Import 
 import multer from 'multer'; // For file uploads
 import { parse } from 'csv-parse'; // For CSV parsing
 import { Readable } from 'stream'; // To create readable stream from buffer
+import fetch from 'node-fetch'; // <-- Add node-fetch
+import { XMLParser } from 'fast-xml-parser'; // <-- Add fast-xml-parser
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +46,11 @@ const upload = multer({ storage: storage });
 // Routes
 app.get('/', (req, res) => {
   res.render('index');
+});
+
+// NEW: Subscriptions Page Route
+app.get('/subscriptions', (req, res) => {
+  res.render('subscriptions');
 });
 
 // Search videos
@@ -80,7 +87,7 @@ app.get('/api/video/:id', async (req, res) => {
     const { id } = req.params;
     const video = await youtube.getInfo(id);
     // Keep this log uncommented for now, it's very helpful for debugging structure issues
-    console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
+    // console.log('Full video getInfo response:', JSON.stringify(video, null, 2));
 
     let chapters = [];
     let markersMap = null;
@@ -472,6 +479,83 @@ app.get('/api/channel/:id/videos', async (req, res) => {
   }
 });
 
+// --- NEW: Subscriptions Feed Aggregation ---
+app.get('/api/subscriptions/feed', async (req, res) => {
+  try {
+    console.log("Fetching subscriptions feed...");
+    const subscriptions = await SubscriptionsRepo.getAllSubscriptions();
+    console.log(`Found ${subscriptions.length} subscriptions.`);
+
+    if (subscriptions.length === 0) {
+      return res.json([]); // Return empty if no subscriptions
+    }
+
+    const xmlParser = new XMLParser({
+      ignoreAttributes: false, // Keep attributes like href, url
+      attributeNamePrefix: "@_", // Prefix attributes to avoid name clash
+      allowBooleanAttributes: true
+    });
+
+    const feedPromises = subscriptions.map(async (sub) => {
+      const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${sub.channel_id}`;
+      console.log(`Fetching feed for ${sub.name} (${sub.channel_id}) from ${feedUrl}`);
+      try {
+        const response = await fetch(feedUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status} for ${sub.channel_id}`);
+        }
+        const xmlData = await response.text();
+        const feed = xmlParser.parse(xmlData);
+
+        // Handle case where feed.feed.entry is not an array (single video)
+        const entries = Array.isArray(feed?.feed?.entry)
+          ? feed.feed.entry
+          : feed?.feed?.entry ? [feed.feed.entry] : [];
+
+        return entries.map(entry => {
+          const videoId = entry['yt:videoId'];
+          const title = entry.title;
+          const channelName = entry.author?.name;
+          const channelId = entry['yt:channelId'];
+          const published = entry.published; // Keep as ISO string for sorting
+          const thumbnail = entry['media:group']?.['media:thumbnail']?.['@_url'];
+
+          if (!videoId || !title || !channelName || !channelId || !published || !thumbnail) {
+            console.warn(`Skipping entry due to missing data in feed for ${sub.channel_id}:`, entry);
+            return null; // Skip incomplete entries
+          }
+
+          return {
+            id: videoId,
+            title: title,
+            channelName: channelName,
+            channelId: channelId,
+            published: published,
+            thumbnailUrl: thumbnail
+          };
+        }).filter(video => video !== null); // Filter out null (skipped) entries
+      } catch (error) {
+        console.error(`Failed to fetch or parse feed for ${sub.channel_id}:`, error);
+        return []; // Return empty array for this channel on error
+      }
+    });
+
+    const allVideosNested = await Promise.all(feedPromises);
+    const allVideos = allVideosNested.flat(); // Flatten the array of arrays
+
+    // Sort by published date (descending)
+    allVideos.sort((a, b) => new Date(b.published) - new Date(a.published));
+
+    console.log(`Returning ${allVideos.length} aggregated videos.`);
+    res.json(allVideos);
+
+  } catch (error) {
+    console.error('Error aggregating subscription feeds:', error);
+    res.status(500).json({ error: 'Failed to aggregate subscription feeds' });
+  }
+});
+// --- End Subscriptions Feed Aggregation ---
+
 // --- Database API Routes ---
 
 // Settings
@@ -658,7 +742,6 @@ app.get('/api/subscriptions/:channelId/status', async (req, res) => {
   }
 });
 
-
 // Playlists
 app.get('/api/playlists', async (req, res) => {
   try {
@@ -798,7 +881,6 @@ app.put('/api/playlists/:id/videos/order', async (req, res) => {
     res.status(500).json({ error: `Failed to update video order for playlist ${playlistId}` });
   }
 });
-
 
 // Watch History
 app.get('/api/watch-history', async (req, res) => {
