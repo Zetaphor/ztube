@@ -3,6 +3,17 @@
  */
 import { showError, showLoading, hideLoading } from './utils.js';
 
+// --- Simple HTML escaping function ---
+function escapeHtml(unsafe) {
+  if (unsafe === null || unsafe === undefined) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // --- Modal Elements ---
 let modalElement = null;
 let modalContentElement = null;
@@ -208,8 +219,13 @@ function closeModal() {
 async function loadPlaylistsIntoModal() {
   if (!modalContentElement) return;
 
+  // Show a loading state within the modal content area
+  modalContentElement.innerHTML = '<p class="text-zinc-400 text-sm text-center py-4">Loading playlists...</p>';
+  // Apply grid classes here
+  modalContentElement.className = 'space-y-3 max-h-60 overflow-y-auto mb-4 pr-2 grid grid-cols-2 gap-2'; // Added grid classes, removed space-y-3
+
   try {
-    const response = await fetch('/api/playlists');
+    const response = await fetch('/api/playlists'); // This now includes video_count and thumbnails
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || `Failed to load playlists: ${response.status}`);
@@ -219,21 +235,58 @@ async function loadPlaylistsIntoModal() {
     modalContentElement.innerHTML = ''; // Clear loading message
 
     if (!playlists || playlists.length === 0) {
-      modalContentElement.innerHTML = '<p class="text-zinc-400 text-sm">No playlists yet. Create one below.</p>';
+      modalContentElement.innerHTML = '<p class="col-span-2 text-zinc-400 text-sm text-center">No playlists yet. Create one below.</p>'; // Added col-span-2
     } else {
       playlists.forEach(playlist => {
-        const playlistItem = document.createElement('button');
-        playlistItem.className = 'w-full text-left px-3 py-2 rounded bg-zinc-700 hover:bg-green-700 text-zinc-100 text-sm transition-colors duration-150';
-        playlistItem.textContent = playlist.name;
-        playlistItem.dataset.playlistId = playlist.id;
-        playlistItem.addEventListener('click', () => handlePlaylistSelection(playlist.id, playlist.name));
-        modalContentElement.appendChild(playlistItem);
+        const playlistItemContainer = document.createElement('div');
+        // Removed mb-2 as gap is handled by grid
+        playlistItemContainer.className = 'playlist-item-container rounded overflow-hidden bg-zinc-700 hover:bg-green-700 transition-colors duration-150';
+
+        // --- Thumbnail Grid Logic (adapted for modal) ---
+        let thumbnailGridHTML = '';
+        const thumbnails = playlist.thumbnails || [];
+        const validThumbnails = thumbnails.slice(0, 4); // Max 4 thumbnails
+        if (validThumbnails.length > 0) {
+          const gridCols = validThumbnails.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
+          // Use aspect-video, keep it consistent
+          const aspectClass = 'aspect-video';
+          thumbnailGridHTML = `
+            <div class="thumbnail-grid-modal grid ${gridCols} gap-1 mb-1 rounded overflow-hidden">
+              ${validThumbnails.map(thumbUrl => `
+                <div class="${aspectClass} bg-zinc-600">
+                  <img src="${escapeHtml(thumbUrl)}" alt="Playlist thumbnail" class="w-full h-full object-cover" loading="lazy">
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+        // --- End Thumbnail Grid Logic ---
+
+        const videoCountText = `${playlist.video_count || 0} video${playlist.video_count !== 1 ? 's' : ''}`;
+
+        const playlistButton = document.createElement('button');
+        // Removed background/hover/rounded from button, moved to container. Added padding.
+        playlistButton.className = 'w-full text-left text-zinc-100 flex flex-col p-2';
+        playlistButton.dataset.playlistId = playlist.id;
+
+        playlistButton.innerHTML = `
+          ${thumbnailGridHTML}
+          <div class="flex justify-between items-center w-full">
+             <span class="font-medium text-sm truncate pr-2" title="${escapeHtml(playlist.name)}">${escapeHtml(playlist.name)}</span>
+             <span class="text-xs text-zinc-400 flex-shrink-0">${videoCountText}</span>
+          </div>
+        `;
+
+        playlistButton.addEventListener('click', () => handlePlaylistSelection(playlist.id, playlist.name));
+        playlistItemContainer.appendChild(playlistButton);
+        modalContentElement.appendChild(playlistItemContainer);
       });
     }
 
   } catch (error) {
     console.error('Error loading playlists into modal:', error);
-    modalContentElement.innerHTML = `<p class="text-red-500 text-sm">Error loading playlists: ${error.message}</p>`;
+    // Added col-span-2
+    modalContentElement.innerHTML = `<p class="col-span-2 text-red-500 text-sm p-3 text-center">Error loading playlists: ${error.message}</p>`;
   }
 }
 
