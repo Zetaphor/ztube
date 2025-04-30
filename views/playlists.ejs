@@ -13,63 +13,45 @@
 <body class="bg-zinc-900 text-zinc-100">
   <div class="flex h-screen">
     <!-- Sidebar (Consider using EJS include for DRYness) -->
-    <aside id="sidebar"
-      class="w-16 bg-zinc-800 text-zinc-100 px-4 pt-0 fixed inset-y-0 left-0 z-40 overflow-y-auto flex flex-col items-center">
-      <ul class="flex flex-col items-center space-y-4 mt-4">
-        <li class="mb-2"><a href="/" class="hover:text-green-400 text-2xl"><i class="fas fa-bookmark"></i></a></li>
-        <li class="mb-2"><a href="/playlists" class="hover:text-green-400 text-2xl text-green-500"><i
-              class="fas fa-list-ul"></i></a></li> <!-- Active -->
-        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-history"></i></a></li>
-        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-user"></i></a></li>
-        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-cog"></i></a></li>
-      </ul>
-    </aside>
+    <%- include('partials/sidebar', { activePage: 'playlists' }) %>
 
-    <!-- Main Content Area -->
-    <div id="main-content" class="flex-1 flex flex-col ml-16">
-      <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
-        <div class="container mx-auto flex justify-between items-center">
-          <h1 class="text-2xl font-bold">ZTube</h1>
-          <!-- Search Bar (Consider using EJS include) -->
-          <div class="flex-1 mx-8">
-            <div class="relative">
-              <input type="text" id="searchInput"
-                class="w-full px-4 py-2 rounded-full bg-zinc-700 text-zinc-100 focus:outline-none"
-                placeholder="Search videos...">
-              <button id="searchButton" class="absolute right-0 top-0 mt-2 mr-4 text-zinc-400">
-                <i class="fas fa-search"></i>
+      <!-- Main Content Area -->
+      <div id="main-content" class="flex-1 flex flex-col ml-16">
+        <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
+          <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">ZTube</h1>
+            <!-- Search Bar (Consider using EJS include) -->
+            <%- include('partials/navbarSearch') %>
+          </div>
+        </nav>
+
+        <main class="container mx-auto p-4 flex-grow">
+          <div id="loadingIndicator" class="text-center py-4 hidden"><i
+              class="fas fa-spinner fa-spin mr-2"></i>Loading...
+          </div>
+          <div id="errorDisplay" class="text-red-500 text-center py-2 hidden"></div>
+
+          <!-- Create Playlist Form -->
+          <div class="mb-6 bg-zinc-800 p-4 rounded-lg shadow">
+            <h2 class="text-xl font-semibold mb-3 text-zinc-100">Create New Playlist</h2>
+            <div class="flex items-center space-x-2">
+              <input type="text" id="newPlaylistName" placeholder="Playlist Name"
+                class="flex-grow px-3 py-2 rounded bg-zinc-700 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-green-500">
+              <input type="text" id="newPlaylistDescription" placeholder="Optional Description"
+                class="flex-grow px-3 py-2 rounded bg-zinc-700 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-green-500">
+              <button id="createPlaylistBtn"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-150">
+                <i class="fas fa-plus mr-1"></i> Create
               </button>
             </div>
           </div>
-        </div>
-      </nav>
 
-      <main class="container mx-auto p-4 flex-grow">
-        <div id="loadingIndicator" class="text-center py-4 hidden"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...
-        </div>
-        <div id="errorDisplay" class="text-red-500 text-center py-2 hidden"></div>
-
-        <!-- Create Playlist Form -->
-        <div class="mb-6 bg-zinc-800 p-4 rounded-lg shadow">
-          <h2 class="text-xl font-semibold mb-3 text-zinc-100">Create New Playlist</h2>
-          <div class="flex items-center space-x-2">
-            <input type="text" id="newPlaylistName" placeholder="Playlist Name"
-              class="flex-grow px-3 py-2 rounded bg-zinc-700 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-green-500">
-            <input type="text" id="newPlaylistDescription" placeholder="Optional Description"
-              class="flex-grow px-3 py-2 rounded bg-zinc-700 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-green-500">
-            <button id="createPlaylistBtn"
-              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-150">
-              <i class="fas fa-plus mr-1"></i> Create
-            </button>
+          <!-- Playlist List -->
+          <div id="playlistList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Playlists will be loaded here by JS -->
           </div>
-        </div>
-
-        <!-- Playlist List -->
-        <div id="playlistList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <!-- Playlists will be loaded here by JS -->
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
   </div>
   <script src="/js/playlists.js" type="module"></script>
 </body>
