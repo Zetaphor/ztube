@@ -1,3 +1,4 @@
+import { showError } from './utils.js';
 // DOM Elements
 const getRecommendedContainer = () => document.getElementById('recommendedVideos')?.querySelector('.space-y-3');
 
@@ -81,7 +82,7 @@ function displayRecommendedVideos(videos) {
 export async function fetchRecommendedVideos(videoId) {
   const recommendedContainer = getRecommendedContainer();
   if (!recommendedContainer) {
-    console.error("Recommended videos container element not found!");
+    console.error("[Recommended] Recommended videos container element not found!");
     return;
   }
 
@@ -89,16 +90,24 @@ export async function fetchRecommendedVideos(videoId) {
 
   try {
     const response = await fetch(`/api/video/${videoId}/recommendations`);
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch recommendations: ${response.status}`);
+      let errorText = `Failed to fetch recommendations: ${response.status}`;
+      try {
+        const errorData = await response.text();
+        errorText += ` - ${errorData}`;
+      } catch (e) { /* Ignore if reading text fails */ }
+      console.error("[Recommended] Fetch Error Text:", errorText);
+      throw new Error(errorText);
     }
+
     const recommendations = await response.json();
     displayRecommendedVideos(recommendations);
+
   } catch (error) {
-    console.error('Failed to fetch or display recommendations:', error);
+    console.error('[Recommended] Error in fetchRecommendedVideos:', error);
     recommendedContainer.innerHTML = '<p class="text-red-500 text-sm">Failed to load recommendations.</p>';
-    // Optionally show error using a utility function if available/imported
-    // import { showError } from './utils.js'; showError('Failed to load recommendations.');
+    showError('Failed to load recommendations.');
   }
 }
 

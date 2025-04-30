@@ -225,7 +225,6 @@ function displayResults(results, targetElement) {
 }
 
 function createVideoCard(video) {
-  console.log("Creating video card for:", video); // Log the received video object
   const card = document.createElement('div');
   card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105';
 
