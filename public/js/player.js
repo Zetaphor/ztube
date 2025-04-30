@@ -12,7 +12,6 @@ let keydownAttached = false;
 // These functions help avoid repeated getElementById calls and make dependencies clearer.
 const getElement = (id) => document.getElementById(id);
 const getPlayerContainer = () => getElement('player');
-const getVideoPlayerOverlay = () => getElement('videoPlayer');
 const getCustomControls = () => getElement('customControls');
 const getPlayPauseBtn = () => getElement('playPauseBtn');
 const getProgressBar = () => getElement('progressBar');
@@ -289,35 +288,42 @@ function toggleFullscreen() {
   }
 }
 
-
+// Redefined Theater Mode Function for new layout
 function toggleTheaterMode() {
-  const videoPlayer = getVideoPlayerOverlay();
+  const videoPlayerDiv = document.getElementById('videoPlayer'); // The main container for player + recommendations
+  const mainPlayerContent = document.getElementById('mainPlayerContent');
+  const recommendedVideos = document.getElementById('recommendedVideos');
   const theaterModeBtn = getTheaterModeBtn();
-  const chaptersHeader = document.getElementById('chaptersHeader');
-  if (!videoPlayer || !theaterModeBtn) return;
 
-  videoPlayer.classList.toggle('theater-mode');
-
-  if (chaptersHeader) {
-    chaptersHeader.classList.toggle('theater-mode');
+  if (!videoPlayerDiv || !mainPlayerContent || !recommendedVideos || !theaterModeBtn) {
+    console.warn('Theater mode elements not found.');
+    return;
   }
 
-  if (videoPlayer.classList.contains('theater-mode')) {
-    theaterModeBtn.innerHTML = '<i class="fas fa-compress-alt"></i>'; // Icon for exiting theater mode
+  // Toggle a class on the parent container
+  videoPlayerDiv.classList.toggle('theater-mode-active');
+
+  if (videoPlayerDiv.classList.contains('theater-mode-active')) {
+    // --- Activate Theater Mode ---
+    // Hide recommendations
+    recommendedVideos.classList.add('hidden');
+    // Make main content wider (CSS will handle this via the parent class)
+    mainPlayerContent.classList.remove('md:w-2/3'); // Remove the fractional width constraint
+    mainPlayerContent.classList.add('md:w-full'); // Make it full width on medium+ screens
+    theaterModeBtn.innerHTML = '<i class="fas fa-compress-alt"></i>'; // Icon for exiting
+
   } else {
-    theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>'; // Icon for entering theater mode
+    // --- Deactivate Theater Mode ---
+    // Show recommendations
+    recommendedVideos.classList.remove('hidden');
+    // Restore main content width
+    mainPlayerContent.classList.remove('md:w-full');
+    mainPlayerContent.classList.add('md:w-2/3'); // Restore default width
+    theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>'; // Icon for entering
   }
-  // Optional: Force resize check after mode toggle
-  if (ytPlayer && typeof ytPlayer.setSize === 'function' && playerResizeObserver) {
-    const playerContainer = getPlayerContainer();
-    if (playerContainer) {
-      const { width, height } = playerContainer.getBoundingClientRect();
-      if (width > 0 && height > 0) {
-        console.log(`Theater Toggle: Setting player size to ${width}x${height}`);
-        ytPlayer.setSize(width, height);
-      }
-    }
-  }
+
+  // Optional: Trigger resize observer logic if needed, though CSS should handle layout
+  // window.dispatchEvent(new Event('resize')); // Could force reflow
 }
 
 function updateQualityDisplay(quality, qualityBtn) {
@@ -332,12 +338,12 @@ function updateQualityDisplay(quality, qualityBtn) {
 
 // === Keyboard Shortcut Handler (Private) ===
 function handleKeydown(event) {
-  const videoPlayer = getVideoPlayerOverlay();
+  // const videoPlayer = getVideoPlayerOverlay(); // REMOVED: No longer needed/exists
   const speedOptions = getSpeedOptions();
   const volumeLevel = getVolumeLevel(); // Needed for direct UI update
 
   // Ignore if player isn't active, input field focused, or speed options shown
-  if (!ytPlayer || !videoPlayer || videoPlayer.classList.contains('hidden') ||
+  if (!ytPlayer || // REMOVED: !videoPlayer || videoPlayer.classList.contains('hidden') ||
     ['INPUT', 'TEXTAREA'].includes(event.target.tagName) ||
     (speedOptions && !speedOptions.classList.contains('hidden'))) {
     return;
@@ -685,11 +691,12 @@ function setupCustomControls() {
  */
 export function initPlayer(videoId, initialChapters = []) {
   const playerContainer = getPlayerContainer();
-  const videoPlayerOverlay = getVideoPlayerOverlay();
+  // const videoPlayerOverlay = getVideoPlayerOverlay(); // No longer needed for show/hide
   const customControls = getCustomControls();
 
-  if (!playerContainer || !videoPlayerOverlay) {
-    console.error("Player Module: Player container (#player) or overlay (#videoPlayer) not found!");
+  // if (!playerContainer || !videoPlayerOverlay) { // Check only for playerContainer
+  if (!playerContainer) {
+    console.error("Player Module: Player container (#player) not found!");
     return;
   }
 
@@ -708,9 +715,9 @@ export function initPlayer(videoId, initialChapters = []) {
   }
 
   try {
-    // Ensure overlay is visible and body scroll is hidden NOW
-    videoPlayerOverlay.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
+    // Ensure overlay is visible and body scroll is hidden NOW - REMOVED
+    // videoPlayerOverlay.classList.remove('hidden');
+    // document.body.classList.add('overflow-hidden');
 
     ytPlayer = new YT.Player('player', { // Use the ID 'player'
       videoId: videoId,
@@ -803,11 +810,6 @@ export function destroyPlayer() {
   // Clear SponsorBlock state
   SponsorBlock.clearSponsorSegmentsState();
   SponsorBlock.setPlayerInstance(null); // Clear player instance in SponsorBlock
-
-  // Hide the player overlay and restore body scroll
-  const videoPlayerOverlay = getVideoPlayerOverlay();
-  if (videoPlayerOverlay) videoPlayerOverlay.classList.add('hidden');
-  document.body.classList.remove('overflow-hidden');
 
   // Reset UI elements to default state
   const playPauseBtn = getPlayPauseBtn();

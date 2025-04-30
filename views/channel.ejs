@@ -24,94 +24,114 @@
 </head>
 
 <body class="bg-zinc-900 text-zinc-100">
-  <!-- Simple Navbar - Can be reused or customized -->
-  <nav class="bg-green-600 text-white p-4 sticky top-0 z-50">
-    <div class="container mx-auto flex justify-between items-center">
-      <a href="/" class="text-2xl font-bold">ZTube</a>
-      <!-- Add search bar if desired -->
-      <div class="flex-1 mx-8">
-        <div class="relative">
-          <input type="text" id="searchInput"
-            class="w-full px-4 py-2 rounded-full bg-zinc-700 text-zinc-100 focus:outline-none"
-            placeholder="Search videos...">
-          <button id="searchButton" class="absolute right-0 top-0 mt-2 mr-4 text-zinc-400">
-            <i class="fas fa-search"></i>
-          </button>
+  <div class="flex h-screen">
+    <!-- Sidebar (Copied from index.ejs) -->
+    <aside id="sidebar"
+      class="w-16 bg-zinc-800 text-zinc-100 px-4 pt-0 fixed inset-y-0 left-0 z-40 overflow-y-auto flex flex-col items-center">
+      <ul class="flex flex-col items-center space-y-4 mt-4">
+        <li class="mb-2"><a href="/" class="hover:text-green-400 text-2xl"><i class="fas fa-home"></i></a></li>
+        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-bookmark"></i></a></li>
+        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-history"></i></a></li>
+        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-user"></i></a></li>
+        <li class="mb-2"><a href="#" class="hover:text-green-400 text-2xl"><i class="fas fa-cog"></i></a></li>
+        <!-- Add more sidebar items here -->
+      </ul>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div id="main-content" class="flex-1 flex flex-col ml-16">
+      <!-- Navbar -->
+      <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
+        <div class="container mx-auto flex justify-between items-center">
+          <a href="/" class="text-2xl font-bold">ZTube</a>
+          <!-- Add search bar if desired -->
+          <div class="flex-1 mx-8">
+            <div class="relative">
+              <input type="text" id="searchInput"
+                class="w-full px-4 py-2 rounded-full bg-zinc-700 text-zinc-100 focus:outline-none"
+                placeholder="Search videos...">
+              <button id="searchButton" class="absolute right-0 top-0 mt-2 mr-4 text-zinc-400">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </nav>
+      </nav>
 
-  <main class="container mx-auto mt-4 pt-20">
-    <!-- Channel Header -->
-    <div class="channel-banner rounded-t-lg" style="background-image: url('<%= channel.banner %>');"></div>
-    <div class="bg-zinc-800 p-4 rounded-b-lg shadow-md">
-      <div class="flex flex-col sm:flex-row items-center">
-        <img src="<%= channel.avatar %>" alt="<%= channel.name %>"
-          class="w-24 h-24 rounded-full border-4 border-zinc-900 -mt-12 sm:mr-6 mb-4 sm:mb-0">
-        <div class="flex-1 text-center sm:text-left">
-          <h1 class="text-3xl font-bold text-zinc-100">
-            <%= channel.name %>
-          </h1>
-          <p class="text-zinc-400 mt-1">
-            <%= channel.subscriber_count %>
-          </p>
-          <% if (channel.video_count) { %>
-            <p class="text-zinc-400 text-sm">
-              <%= channel.video_count %>
-            </p>
-            <% } %>
+      <!-- Channel Specific Main Content -->
+      <main class="container mx-auto mt-4 flex-grow p-4">
+        <!-- Channel Header -->
+        <div class="channel-banner rounded-t-lg" style="background-image: url('<%= channel.banner %>');"></div>
+        <div class="bg-zinc-800 p-4 rounded-b-lg shadow-md mb-6">
+          <div class="flex flex-col sm:flex-row items-center">
+            <img src="<%= channel.avatar %>" alt="<%= channel.name %>"
+              class="w-24 h-24 rounded-full border-4 border-zinc-900 -mt-12 sm:mr-6 mb-4 sm:mb-0">
+            <div class="flex-1 text-center sm:text-left">
+              <h1 class="text-3xl font-bold text-zinc-100">
+                <%= channel.name %>
+              </h1>
+              <p class="text-zinc-400 mt-1">
+                <%= channel.subscriber_count %>
+              </p>
+              <% if (channel.video_count) { %>
+                <p class="text-zinc-400 text-sm">
+                  <%= channel.video_count %> videos
+                </p>
+                <% } %>
+            </div>
+            <!-- Add Subscribe button or other actions here -->
+          </div>
         </div>
-        <!-- Add Subscribe button or other actions here -->
-      </div>
-    </div>
 
-    <!-- Channel Content (Tabs, Videos, Playlists, etc.) -->
-    <div class="mt-6">
-      <!-- Tabs (Example Structure) -->
-      <div class="border-b border-zinc-700 mb-4">
-        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-          <!-- Current: "border-green-500 text-green-500", Default: "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300" -->
-          <a href="#" class="border-green-500 text-green-500 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
-            aria-current="page">
-            Videos
-          </a>
-          <a href="#"
-            class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-            Playlists
-          </a>
-          <a href="#"
-            class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-            About
-          </a>
-          <!-- Add more tabs as needed -->
-        </nav>
-      </div>
+        <!-- Channel Content (Tabs, Videos, Playlists, etc.) -->
+        <div>
+          <!-- Tabs (Example Structure) -->
+          <div class="border-b border-zinc-700 mb-4">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+              <!-- Current: "border-green-500 text-green-500", Default: "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300" -->
+              <a href="#"
+                class="border-green-500 text-green-500 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
+                aria-current="page">
+                Videos
+              </a>
+              <a href="#"
+                class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Playlists
+              </a>
+              <a href="#"
+                class="border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                About
+              </a>
+              <!-- Add more tabs as needed -->
+            </nav>
+          </div>
 
-      <!-- Content Area (Load dynamically) -->
-      <div id="channelContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <!-- Videos/Playlists will be loaded here by JavaScript -->
-        <p class="col-span-full text-center text-zinc-500 py-8">Loading content...</p>
-      </div>
-    </div>
+          <!-- Content Area (Load dynamically) -->
+          <div id="channelContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Videos/Playlists will be loaded here by JavaScript -->
+            <p class="col-span-full text-center text-zinc-500 py-8">Loading content...</p>
+          </div>
+        </div>
+      </main>
+      <!-- End Channel Specific Main Content -->
 
-  </main>
+      <!-- Shared Video Player Partial -->
+      <%- include('partials/videoPlayer') %>
+    </div> <!-- End #main-content -->
+  </div> <!-- End flex container -->
 
-  <%- include('partials/videoPlayer') %>
-    <!-- End Copied Video Player Structure -->
-
-    <!-- YouTube IFrame API (needed for player) -->
-    <script src="https://www.youtube.com/iframe_api"></script>
-    <!-- Link to shared app logic first -->
-    <script src="/js/app.js" type="module"></script>
-    <!-- Link to the new channel-specific JS file -->
-    <script src="/js/channel.js"></script>
-    <script>
-      // Pass channel data to the external script
-      const channelData = JSON.parse('<%- JSON.stringify(channel || {}) %>');
-      // console.log('Channel Data (passed to channel.js):', channelData);
-      // Remove inline logic, it's now in channel.js
-    </script>
+  <!-- YouTube IFrame API (needed for player) -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- Link to shared app logic first -->
+  <script src="/js/app.js" type="module"></script>
+  <!-- Link to the channel-specific JS file -->
+  <script src="/js/channel.js"></script>
+  <script>
+    // Pass channel data to the external script
+    const channelData = JSON.parse('<%- JSON.stringify(channel || {}) %>');
+    // console.log('Channel Data (passed to channel.js):', channelData);
+    // Remove inline logic, it's now in channel.js
+  </script>
 
 </body>
 

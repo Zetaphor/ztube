@@ -17,10 +17,23 @@ let currentVideoId = null;
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
   console.log(`app.js: window.loadAndDisplayVideo called for ${videoId}`);
+  const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
+  const mainIndexContent = document.getElementById('content'); // Grid on index page
+  const mainChannelContent = document.getElementById('channelContent'); // Grid on channel page
+
+  if (!videoPlayerContainer) {
+    showError('Video player container not found.');
+    return;
+  }
 
   try {
     showLoading();
     currentVideoId = videoId;
+
+    // Hide main content grid and show player container
+    if (mainIndexContent) mainIndexContent.classList.add('hidden');
+    if (mainChannelContent) mainChannelContent.classList.add('hidden');
+    videoPlayerContainer.classList.remove('hidden');
 
     // --- Get and display date from card immediately ---
     const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
@@ -291,7 +304,16 @@ async function playVideo(videoId, videoCardElement) {
 // App-level function to handle closing the player
 function closeVideoPlayer() {
   console.log("app.js: closeVideoPlayer called");
+  const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
+  const mainIndexContent = document.getElementById('content'); // Grid on index page
+  const mainChannelContent = document.getElementById('channelContent'); // Grid on channel page
+
   Player.destroyPlayer(); // Call the player module's destroy function
+
+  // Hide player container and show main content grid
+  if (videoPlayerContainer) videoPlayerContainer.classList.add('hidden');
+  if (mainIndexContent) mainIndexContent.classList.remove('hidden');
+  if (mainChannelContent) mainChannelContent.classList.remove('hidden');
 
   // Clear app-specific state related to the video
   currentVideoId = null;
