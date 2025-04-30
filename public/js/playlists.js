@@ -36,28 +36,52 @@ function displayPlaylists(playlists) {
 
   playlists.forEach(playlist => {
     const card = document.createElement('div');
-    card.className = 'bg-zinc-800 rounded-lg shadow p-4 flex flex-col justify-between';
+    card.className = 'bg-zinc-800 rounded-lg shadow p-4 flex flex-col justify-between min-h-[10rem]';
     card.dataset.playlistId = playlist.id;
     card.dataset.isDefault = playlist.is_default; // Store default status
 
     const nameInputId = `name-input-${playlist.id}`;
     const descInputId = `desc-input-${playlist.id}`;
 
+    // --- Thumbnail Grid Logic ---
+    let thumbnailGridHTML = '';
+    const thumbnails = playlist.thumbnails || [];
+    const validThumbnails = thumbnails.slice(0, 4); // Max 4 thumbnails
+    if (validThumbnails.length > 0) {
+      // Determine grid columns: 1 for 1 thumb, 2 for 2-4 thumbs
+      const gridCols = validThumbnails.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
+      // Use aspect-square for single thumbnail, aspect-video for multiple
+      const aspectClass = validThumbnails.length === 1 ? 'aspect-square' : 'aspect-video';
+      thumbnailGridHTML = `
+        <div class="thumbnail-grid grid ${gridCols} gap-1 my-3">
+          ${validThumbnails.map(thumbUrl => `
+            <div class="rounded overflow-hidden ${aspectClass} bg-zinc-700">
+                <img src="${escapeHtml(thumbUrl)}" alt="Playlist thumbnail" class="w-full h-full object-cover" loading="lazy">
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+    // --- End Thumbnail Grid Logic ---
+
+    const videoCountText = `${playlist.video_count || 0} video${playlist.video_count !== 1 ? 's' : ''}`;
+
     card.innerHTML = `
-            <div>
-                <h3 class="font-semibold text-lg mb-1 text-zinc-100 overflow-hidden text-ellipsis whitespace-nowrap flex items-center" title="${playlist.name}">
-                   <a href="/playlists/${playlist.id}" class="hover:text-green-400 mr-2">${playlist.name}</a>
+            <a href="/playlists/${playlist.id}" class="block hover:bg-zinc-700/50 rounded-t-lg -m-4 p-4 mb-2 transition-colors duration-150">
+                <h3 class="font-semibold text-lg mb-1 text-zinc-100 overflow-hidden text-ellipsis whitespace-nowrap flex items-center" title="${escapeHtml(playlist.name)}">
+                   ${escapeHtml(playlist.name)}
                    <span class="default-indicator text-xs text-yellow-400 ml-auto"></span>
                 </h3>
-                <p class="text-sm text-zinc-400 mb-3 overflow-hidden text-ellipsis whitespace-nowrap" title="${playlist.description || ''}">${playlist.description || 'No description'}</p>
+                <p class="text-sm text-zinc-400 mb-1 overflow-hidden text-ellipsis whitespace-nowrap" title="${escapeHtml(playlist.description || '')}">${escapeHtml(playlist.description || 'No description')}</p>
+                <p class="text-xs text-zinc-500 mb-2">${videoCountText}</p>
 
-                <!-- Edit Form (Initially Hidden) -->
-                <div class="edit-form hidden mt-2 space-y-2">
-                     <input type="text" id="${nameInputId}" value="${escapeHtml(playlist.name)}" class="w-full px-2 py-1 rounded bg-zinc-700 text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-green-500">
-                     <input type="text" id="${descInputId}" value="${escapeHtml(playlist.description || '')}" placeholder="Description" class="w-full px-2 py-1 rounded bg-zinc-700 text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-green-500">
-                </div>
+                ${thumbnailGridHTML}
+            </a>
+            <div class="edit-form hidden mt-2 space-y-2 px-4 pb-4">
+                 <input type="text" id="${nameInputId}" value="${escapeHtml(playlist.name)}" class="w-full px-2 py-1 rounded bg-zinc-700 text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-green-500">
+                 <input type="text" id="${descInputId}" value="${escapeHtml(playlist.description || '')}" placeholder="Description" class="w-full px-2 py-1 rounded bg-zinc-700 text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-green-500">
             </div>
-            <div class="flex justify-end space-x-2 mt-3 pt-3 border-t border-zinc-700">
+            <div class="flex justify-end space-x-2 mt-auto pt-3 border-t border-zinc-700 px-4 pb-3">
                 <button class="set-default-btn text-zinc-400 hover:text-yellow-500 text-sm hidden" title="Set as Default Playlist">
                     <i class="fas fa-star"></i>
                 </button>
@@ -83,8 +107,10 @@ function displayPlaylists(playlists) {
     const cancelBtn = card.querySelector('.cancel-btn');
     const deleteBtn = card.querySelector('.delete-btn');
     const editForm = card.querySelector('.edit-form');
-    const nameDisplay = card.querySelector('h3 a');
-    const descDisplay = card.querySelector('p');
+    const clickableArea = card.querySelector('a');
+    const descDisplay = card.querySelector('p:nth-of-type(1)');
+    const videoCountDisplay = card.querySelector('p:nth-of-type(2)');
+    const thumbnailGridContainer = card.querySelector('.thumbnail-grid');
     const defaultIndicator = card.querySelector('.default-indicator');
     const setDefaultBtn = card.querySelector('.set-default-btn');
 
@@ -92,7 +118,9 @@ function displayPlaylists(playlists) {
     if (playlist.is_default) {
       defaultIndicator.innerHTML = '<i class="fas fa-star mr-1" title="Default Playlist"></i> Default';
       deleteBtn.classList.add('hidden'); // Hide delete for default
-      editBtn.classList.add('mr-auto'); // Push edit button to the left if delete is hidden
+      if (setDefaultBtn.classList.contains('hidden')) {
+        editBtn.classList.add('mr-auto');
+      }
     } else {
       setDefaultBtn.classList.remove('hidden'); // Show set default button
       setDefaultBtn.addEventListener('click', async () => {
@@ -103,23 +131,26 @@ function displayPlaylists(playlists) {
 
     editBtn.addEventListener('click', () => {
       editForm.classList.remove('hidden');
-      nameDisplay.parentElement.classList.add('hidden'); // Hide H3
-      descDisplay.classList.add('hidden'); // Hide P
+      clickableArea.classList.add('hidden');
       editBtn.classList.add('hidden');
-      deleteBtn.classList.add('hidden'); // Hide delete while editing
+      deleteBtn.classList.add('hidden');
+      setDefaultBtn.classList.add('hidden');
       saveBtn.classList.remove('hidden');
       cancelBtn.classList.remove('hidden');
     });
 
     cancelBtn.addEventListener('click', () => {
       editForm.classList.add('hidden');
-      nameDisplay.parentElement.classList.remove('hidden');
-      descDisplay.classList.remove('hidden');
+      clickableArea.classList.remove('hidden');
       editBtn.classList.remove('hidden');
-      deleteBtn.classList.remove('hidden');
+      if (!playlist.is_default) {
+        deleteBtn.classList.remove('hidden');
+        setDefaultBtn.classList.remove('hidden');
+      } else {
+        editBtn.classList.add('mr-auto');
+      }
       saveBtn.classList.add('hidden');
       cancelBtn.classList.add('hidden');
-      // Reset input values to original
       document.getElementById(nameInputId).value = playlist.name;
       document.getElementById(descInputId).value = playlist.description || '';
     });
@@ -134,10 +165,9 @@ function displayPlaylists(playlists) {
       await updatePlaylist(playlist.id, newName, newDescription);
     });
 
-    // Only add delete listener if it's not the default playlist (button is visible)
     if (!playlist.is_default) {
       deleteBtn.addEventListener('click', async () => {
-        if (confirm(`Are you sure you want to delete the playlist "${playlist.name}"? This cannot be undone.`)) {
+        if (confirm(`Are you sure you want to delete the playlist "${escapeHtml(playlist.name)}"? This cannot be undone.`)) {
           await deletePlaylist(playlist.id);
         }
       });

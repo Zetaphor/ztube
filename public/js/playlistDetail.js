@@ -152,7 +152,6 @@ function createPlaylistVideoCard(video, index) {
         <div class="video-thumbnail relative cursor-pointer" onclick="window.loadAndDisplayVideo('${video.video_id}', this.closest('.video-card'))">
             <img src="${thumbnail}" alt="${escapeHtml(video.title) || 'Video thumbnail'}" loading="lazy" class="w-full h-full object-cover aspect-video">
             <!-- ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''} -->
-            <span class="absolute top-1 left-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${index + 1}</span>
         </div>
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-1 text-sm h-10 cursor-pointer hover:text-green-400" title="${escapeHtml(video.title)}" onclick="window.loadAndDisplayVideo('${video.video_id}', this.closest('.video-card'))">${escapeHtml(video.title) || 'Untitled'}</h3>

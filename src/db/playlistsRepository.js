@@ -23,17 +23,55 @@ export const createPlaylist = (name, description = '') => {
 };
 
 /**
- * Gets all playlists.
+ * Gets all playlists, including video count and sample thumbnails.
  * @returns {Promise<Array<object>>} - Array of playlist objects.
  */
 export const getAllPlaylists = () => {
   return new Promise((resolve, reject) => {
-    db.all('SELECT id, name, description, created_at, is_default FROM playlists ORDER BY is_default ASC, name COLLATE NOCASE ASC', [], (err, rows) => {
+    // Use a Common Table Expression (CTE) to get the 4 most recently added thumbnails per playlist
+    const query = `
+      WITH RankedVideos AS (
+        SELECT
+          pv.playlist_id,
+          pv.thumbnail_url,
+          ROW_NUMBER() OVER(PARTITION BY pv.playlist_id ORDER BY pv.added_at DESC) as rn
+        FROM playlist_videos pv
+        WHERE pv.thumbnail_url IS NOT NULL AND pv.thumbnail_url != ''
+      ),
+      Thumbnails AS (
+        SELECT
+          playlist_id,
+          json_group_array(thumbnail_url) as thumbnails_json
+        FROM RankedVideos
+        WHERE rn <= 4
+        GROUP BY playlist_id
+      )
+      SELECT
+        p.id,
+        p.name,
+        p.description,
+        p.created_at,
+        p.is_default,
+        COUNT(pv.video_id) as video_count,
+        COALESCE(t.thumbnails_json, '[]') as thumbnails_json
+      FROM playlists p
+      LEFT JOIN playlist_videos pv ON p.id = pv.playlist_id
+      LEFT JOIN Thumbnails t ON p.id = t.playlist_id
+      GROUP BY p.id, p.name, p.description, p.created_at, p.is_default, t.thumbnails_json
+      ORDER BY p.is_default DESC, p.name COLLATE NOCASE ASC;
+    `;
+
+    db.all(query, [], (err, rows) => {
       if (err) {
-        console.error('Error getting playlists:', err.message);
+        console.error('Error getting playlists with details:', err.message);
         return reject(err);
       }
-      resolve(rows || []);
+      // Parse the JSON string for thumbnails
+      const playlists = rows.map(row => ({
+        ...row,
+        thumbnails: JSON.parse(row.thumbnails_json || '[]')
+      }));
+      resolve(playlists || []);
     });
   });
 };
