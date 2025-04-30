@@ -11,6 +11,9 @@ import * as SubscriptionsRepo from './db/subscriptionsRepository.js';
 import * as PlaylistsRepo from './db/playlistsRepository.js';
 import * as WatchHistoryRepo from './db/watchHistoryRepository.js';
 import * as HiddenContentRepo from './db/hiddenContentRepository.js'; // Import the new repo
+import multer from 'multer'; // For file uploads
+import { parse } from 'csv-parse'; // For CSV parsing
+import { Readable } from 'stream'; // To create readable stream from buffer
 
 // Load environment variables
 dotenv.config();
@@ -33,6 +36,10 @@ app.use(express.json());
 app.use(express.static(join(__dirname, '../public')));
 app.set('view engine', 'ejs');
 app.set('views', join(__dirname, '../views'));
+
+// Multer configuration for handling CSV uploads in memory
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // Routes
 app.get('/', (req, res) => {
@@ -356,7 +363,9 @@ app.get('/channel/:id', async (req, res) => {
     let avatarUrl = '/img/default-avatar.svg'; // Default fallback
     const potentialAvatars = [
       headerContent?.image?.avatar?.image?.[0]?.url, // From PageHeader
-      microformat?.avatar?.[0]?.url // From MicroformatData
+      microformat?.avatar?.[0]?.url, // From MicroformatData
+      channel.header?.channel_header?.author?.thumbnails?.[0]?.url, // Another common path
+      channel.header?.author?.thumbnails?.[0]?.url // Fallback path
     ];
     avatarUrl = potentialAvatars.find(url => url && (url.startsWith('http://') || url.startsWith('https://'))) || avatarUrl;
 
@@ -513,6 +522,112 @@ app.post('/api/subscriptions', async (req, res) => {
     console.error(`API Error POST /api/subscriptions (channelId: ${channelId}):`, error);
     res.status(500).json({ error: `Failed to add subscription for channel ${channelId}` });
   }
+});
+
+// NEW ROUTE: Import Subscriptions from CSV
+app.post('/api/subscriptions/import', upload.single('subscriptionsCsv'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No CSV file uploaded.' });
+  }
+
+  const csvBuffer = req.file.buffer;
+  const parser = parse({
+    columns: true, // Treat the first row as headers
+    skip_empty_lines: true,
+    trim: true,
+  });
+
+  const records = [];
+  let importedCount = 0;
+  const errors = [];
+
+  const stream = Readable.from(csvBuffer);
+
+  stream.pipe(parser)
+    .on('data', (record) => {
+      // Match headers case-insensitively and handle potential extra quotes
+      const channelIdKey = Object.keys(record).find(key => key.toLowerCase().trim() === 'channel id');
+      const channelTitleKey = Object.keys(record).find(key => key.toLowerCase().trim() === 'channel title');
+
+      if (channelIdKey && channelTitleKey) {
+        const channelId = record[channelIdKey]?.trim();
+        let channelTitle = record[channelTitleKey]?.trim();
+
+        // Remove surrounding quotes if present
+        if (channelTitle?.startsWith('"') && channelTitle?.endsWith('"')) {
+          channelTitle = channelTitle.substring(1, channelTitle.length - 1);
+        }
+
+        if (channelId && channelTitle) {
+          records.push({ channelId, name: channelTitle });
+        } else {
+          console.warn('Skipping row due to missing channelId or channelTitle:', record);
+        }
+      } else {
+        console.warn('Skipping row due to missing header keys (expected "Channel ID", "Channel title"):', record);
+      }
+    })
+    .on('end', async () => {
+      console.log(`CSV parsing finished. Found ${records.length} valid records.`);
+      for (const record of records) {
+        try {
+          // Fetch channel details to get the avatar
+          let avatarUrl = null;
+          try {
+            console.log(`Fetching details for channel: ${record.channelId} (${record.name})`);
+            const channel = await youtube.getChannel(record.channelId);
+            // Extract avatar URL - adapt logic based on getChannel response structure
+            // (Similar logic to the /channel/:id route might be needed)
+            const header = channel.header;
+            const headerContent = header?.content; // Specific to PageHeader
+            const microformat = channel.metadata; // MicroformatData
+
+            const potentialAvatars = [
+              headerContent?.image?.avatar?.image?.[0]?.url, // From PageHeader
+              microformat?.avatar?.[0]?.url, // From MicroformatData
+              channel.header?.channel_header?.author?.thumbnails?.[0]?.url, // Another common path
+              channel.header?.author?.thumbnails?.[0]?.url // Fallback path
+            ];
+            avatarUrl = potentialAvatars.find(url => url && (url.startsWith('http://') || url.startsWith('https://'))) || null; // Use null if not found
+
+            if (!avatarUrl) {
+              console.warn(`Could not find avatar for channel ${record.channelId} (${record.name}). Proceeding without it.`);
+            } else {
+              console.log(`Found avatar for ${record.channelId}: ${avatarUrl}`);
+            }
+
+          } catch (channelError) {
+            console.error(`Error fetching channel details for ${record.channelId} (${record.name}):`, channelError.message);
+            // Continue import without avatar if fetching fails
+            errors.push(`Failed to fetch avatar for ${record.name} (${record.channelId}): ${channelError.message}`);
+          }
+
+          // AddSubscription already handles INSERT OR IGNORE
+          await SubscriptionsRepo.addSubscription(record.channelId, record.name, avatarUrl); // Pass the fetched avatarUrl
+          importedCount++;
+        } catch (dbError) {
+          console.error(`Failed to import subscription ${record.channelId} (${record.name}) into DB:`, dbError);
+          errors.push(`Failed to import ${record.name} (${record.channelId}) into DB: ${dbError.message}`);
+        }
+      }
+
+      console.log(`Import process finished. Imported ${importedCount} subscriptions.`);
+
+      if (errors.length > 0) {
+        res.status(207).json({
+          message: `Import partially completed. Processed ${records.length} records, successfully imported ${importedCount} subscriptions. Some errors occurred.`,
+          errors: errors
+        });
+      } else if (importedCount > 0) {
+        res.status(200).json({ message: `Import successful. Added or found ${importedCount} subscriptions.` });
+      } else {
+        res.status(200).json({ message: 'Import finished. No new subscriptions were added (they might already exist).' });
+      }
+    })
+    .on('error', (err) => {
+      console.error('CSV Parsing Error:', err);
+      res.status(400).json({ error: `Failed to parse CSV file: ${err.message}` });
+    });
 });
 
 app.delete('/api/subscriptions/:channelId', async (req, res) => {
