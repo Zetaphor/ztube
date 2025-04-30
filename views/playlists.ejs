@@ -12,7 +12,7 @@
 
 <body class="bg-zinc-900 text-zinc-100">
   <div class="flex h-screen">
-    <!-- Sidebar (Consider using EJS include for DRYness) -->
+    <!-- Sidebar -->
     <%- include('partials/sidebar', { activePage: 'playlists' }) %>
 
       <!-- Main Content Area -->
@@ -20,7 +20,7 @@
         <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
           <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-2xl font-bold">ZTube</h1>
-            <!-- Search Bar (Consider using EJS include) -->
+            <!-- Search Bar -->
             <%- include('partials/navbarSearch') %>
           </div>
         </nav>

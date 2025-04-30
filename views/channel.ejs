@@ -25,7 +25,7 @@
 
 <body class="bg-zinc-900 text-zinc-100">
   <div class="flex h-screen">
-    <!-- Sidebar (Copied from index.ejs) -->
+    <!-- Sidebar -->
     <%- include('partials/sidebar', { activePage: 'channel' }) %>
 
       <!-- Main Content Area -->
@@ -34,12 +34,12 @@
         <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
           <div class="container mx-auto flex justify-between items-center">
             <a href="/" class="text-2xl font-bold">ZTube</a>
-            <!-- Add search bar if desired -->
+            <!-- Search Bar -->
             <%- include('partials/navbarSearch') %>
           </div>
         </nav>
 
-        <!-- Shared Video Player Partial - Moved outside main -->
+        <!-- Shared Video Player Partial -->
         <%- include('partials/videoPlayer') %>
 
           <!-- Channel Specific Main Content -->

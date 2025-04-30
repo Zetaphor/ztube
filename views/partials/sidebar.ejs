@@ -1,22 +1,20 @@
 <aside id="sidebar"
   class="w-16 bg-zinc-800 text-zinc-100 px-4 pt-0 fixed inset-y-0 left-0 z-40 overflow-y-auto flex flex-col items-center">
   <ul class="flex flex-col items-center space-y-4 mt-4">
-    <%# Determine active page dynamically if possible, or pass a variable %>
-      <li class="mb-2"><a href="/"
-          class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'home') ? 'text-green-500' : '' %>"><i
-            class="fas fa-bookmark"></i></a></li>
-      <li class="mb-2"><a href="/playlists"
-          class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'playlists') ? 'text-green-500' : '' %>"><i
-            class="fas fa-list-ul"></i></a></li>
-      <li class="mb-2"><a href="#"
-          class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'history') ? 'text-green-500' : '' %>"><i
-            class="fas fa-history"></i></a></li>
-      <li class="mb-2"><a href="#"
-          class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'user') ? 'text-green-500' : '' %>"><i
-            class="fas fa-user"></i></a></li>
-      <li class="mb-2"><a href="#"
-          class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'settings') ? 'text-green-500' : '' %>"><i
-            class="fas fa-cog"></i></a></li>
-      <!-- Add more sidebar items here -->
+    <li class="mb-2"><a href="/"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'home') ? 'text-green-500' : '' %>"><i
+          class="fas fa-bookmark"></i></a></li>
+    <li class="mb-2"><a href="/playlists"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'playlists') ? 'text-green-500' : '' %>"><i
+          class="fas fa-list-ul"></i></a></li>
+    <li class="mb-2"><a href="#"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'history') ? 'text-green-500' : '' %>"><i
+          class="fas fa-history"></i></a></li>
+    <li class="mb-2"><a href="#"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'user') ? 'text-green-500' : '' %>"><i
+          class="fas fa-user"></i></a></li>
+    <li class="mb-2"><a href="#"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'settings') ? 'text-green-500' : '' %>"><i
+          class="fas fa-cog"></i></a></li>
   </ul>
 </aside>

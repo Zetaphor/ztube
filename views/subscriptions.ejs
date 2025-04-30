@@ -12,65 +12,63 @@
 
 <body class="bg-zinc-900 text-zinc-100">
   <div class="flex h-screen">
-    <!-- Sidebar (Copied from index.ejs) -->
+    <!-- Sidebar -->
     <%- include('partials/sidebar', { activePage: 'subscriptions' }) %>
-      <%# Assuming 'subscriptions' is the identifier for this page %>
+      <!-- Main Content Area -->
+      <div id="main-content" class="flex-1 flex flex-col ml-16">
+        <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
+          <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">ZTube</h1>
+            <%- include('partials/navbarSearch') %>
+          </div>
+        </nav>
 
-        <!-- Main Content Area -->
-        <div id="main-content" class="flex-1 flex flex-col ml-16">
-          <nav class="bg-green-600 text-white p-4 sticky top-0 z-50 w-full">
-            <div class="container mx-auto flex justify-between items-center">
-              <h1 class="text-2xl font-bold">ZTube</h1>
-              <%- include('partials/navbarSearch') %>
-            </div>
-          </nav>
+        <main class="container mx-auto p-4 flex-grow">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold text-zinc-100">Subscriptions</h2>
+            <button id="refreshFeedButton"
+              class="bg-green-600 hover:bg-green-700 text-white font-bold p-3 rounded inline-flex items-center rounded-full text-xl">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+          <div id="subscriptions-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Subscriptions will be loaded here -->
+            <!-- The content is now loaded into the tab views below -->
+          </div>
 
-          <main class="container mx-auto p-4 flex-grow">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-2xl font-semibold text-zinc-100">Subscriptions</h2>
-              <button id="refreshFeedButton"
-                class="bg-green-600 hover:bg-green-700 text-white font-bold p-3 rounded inline-flex items-center rounded-full text-xl">
-                <i class="fas fa-sync-alt"></i>
+          <!-- Tabs -->
+          <div class="border-b border-zinc-700 mb-4">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+              <!-- Current: "border-green-500 text-green-500", Default: "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300" -->
+              <button id="videosTab" data-tab="videos"
+                class="tab-button border-green-500 text-green-500 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
+                aria-current="page">
+                Videos
               </button>
-            </div>
-            <div id="subscriptions-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              <!-- Subscriptions will be loaded here -->
-              <!-- The content is now loaded into the tab views below -->
-            </div>
+              <button id="shortsTab" data-tab="shorts"
+                class="tab-button border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Shorts
+              </button>
+            </nav>
+          </div>
 
-            <!-- Tabs -->
-            <div class="border-b border-zinc-700 mb-4">
-              <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                <!-- Current: "border-green-500 text-green-500", Default: "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300" -->
-                <button id="videosTab" data-tab="videos"
-                  class="tab-button border-green-500 text-green-500 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
-                  aria-current="page">
-                  Videos
-                </button>
-                <button id="shortsTab" data-tab="shorts"
-                  class="tab-button border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-                  Shorts
-                </button>
-              </nav>
-            </div>
+          <!-- Tab Content Area -->
+          <div id="subscriptions-videos-content"
+            class="tab-content grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <!-- Videos will be loaded here -->
+            <p class="col-span-full text-center text-zinc-500 py-8">Loading videos...</p>
+          </div>
+          <div id="subscriptions-shorts-content"
+            class="tab-content grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 hidden">
+            <!-- Shorts will be loaded here (eventually) -->
+            <p class="col-span-full text-center text-zinc-500 py-8">Shorts content not yet implemented.</p>
+          </div>
 
-            <!-- Tab Content Area -->
-            <div id="subscriptions-videos-content"
-              class="tab-content grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              <!-- Videos will be loaded here -->
-              <p class="col-span-full text-center text-zinc-500 py-8">Loading videos...</p>
-            </div>
-            <div id="subscriptions-shorts-content"
-              class="tab-content grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 hidden">
-              <!-- Shorts will be loaded here (eventually) -->
-              <p class="col-span-full text-center text-zinc-500 py-8">Shorts content not yet implemented.</p>
-            </div>
+        </main>
 
-          </main>
+        <%- include('partials/videoPlayer') %>
 
-          <%- include('partials/videoPlayer') %>
-
-        </div> <!-- End #main-content -->
+      </div> <!-- End #main-content -->
   </div> <!-- End flex container -->
 
   <script src="https://www.youtube.com/iframe_api"></script>
