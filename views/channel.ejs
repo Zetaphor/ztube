@@ -84,6 +84,12 @@
                   <% } %>
               </div>
               <!-- Add Subscribe button or other actions here -->
+              <button id="channelPageSubscribeBtn"
+                class="ml-auto px-4 py-2 rounded bg-zinc-600 hover:bg-zinc-500 text-white font-medium text-sm transition-colors"
+                data-channel-id="<%= channel.id %>" data-channel-name="<%= channel.name %>"
+                data-channel-avatar="<%= channel.avatar %>">
+                Subscribe
+              </button>
             </div>
           </div>
 

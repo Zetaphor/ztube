@@ -20,18 +20,18 @@ router.get('/', (req, res) => {
 });
 
 // API: Get all subscriptions
-router.get('/api', async (req, res) => {
+router.get('/all', async (req, res) => {
   try {
     const subs = await SubscriptionsRepo.getAllSubscriptions();
     res.json(subs);
   } catch (error) {
-    console.error('API Error GET /api/subscriptions:', error);
+    console.error('API Error GET /all/subscriptions:', error);
     res.status(500).json({ error: 'Failed to retrieve subscriptions' });
   }
 });
 
 // API: Add a subscription
-router.post('/api', async (req, res) => {
+router.post('/', async (req, res) => {
   const { channelId, name, avatarUrl } = req.body;
   if (!channelId || !name) {
     return res.status(400).json({ error: 'Missing channelId or name in request body' });
@@ -42,13 +42,13 @@ router.post('/api', async (req, res) => {
     await SubscriptionsRepo.addSubscription(channelId, name, validAvatarUrl);
     res.status(201).json({ message: `Subscription added for channel ${channelId}` });
   } catch (error) {
-    console.error(`API Error POST /api/subscriptions (channelId: ${channelId}):`, error);
+    console.error(`API Error POST /subscriptions (channelId: ${channelId}):`, error);
     res.status(500).json({ error: `Failed to add subscription for channel ${channelId}: ${error.message}` });
   }
 });
 
 // API: Import Subscriptions from CSV
-router.post('/api/import', upload.single('subscriptionsCsv'), async (req, res) => {
+router.post('/import', upload.single('subscriptionsCsv'), async (req, res) => {
   const youtube = await getYoutubeClient(); // Get client instance
   if (!req.file) {
     return res.status(400).json({ error: 'No CSV file uploaded.' });
@@ -152,7 +152,7 @@ router.post('/api/import', upload.single('subscriptionsCsv'), async (req, res) =
 });
 
 // API: Remove a subscription
-router.delete('/api/:channelId', async (req, res) => {
+router.delete('/:channelId', async (req, res) => {
   const { channelId } = req.params;
   if (!channelId) {
     return res.status(400).json({ error: 'Missing channelId in request parameters' });
@@ -161,13 +161,13 @@ router.delete('/api/:channelId', async (req, res) => {
     await SubscriptionsRepo.removeSubscription(channelId);
     res.status(200).json({ message: `Subscription removed for channel ${channelId}` });
   } catch (error) {
-    console.error(`API Error DELETE /api/subscriptions/${channelId}:`, error);
+    console.error(`API Error DELETE /subscriptions/${channelId}:`, error);
     res.status(500).json({ error: `Failed to remove subscription for channel ${channelId}: ${error.message}` });
   }
 });
 
 // API: Check subscription status
-router.get('/api/:channelId/status', async (req, res) => {
+router.get('/:channelId/status', async (req, res) => {
   const { channelId } = req.params;
   if (!channelId) {
     return res.status(400).json({ error: 'Missing channelId in request parameters' });
@@ -176,13 +176,13 @@ router.get('/api/:channelId/status', async (req, res) => {
     const isSubbed = await SubscriptionsRepo.isSubscribed(channelId);
     res.json({ isSubscribed: isSubbed });
   } catch (error) {
-    console.error(`API Error GET /api/subscriptions/${channelId}/status:`, error);
+    console.error(`API Error GET /subscriptions/${channelId}/status:`, error);
     res.status(500).json({ error: `Failed to check subscription status for channel ${channelId}: ${error.message}` });
   }
 });
 
 // Subscriptions Feed Aggregation
-router.get('/api/feed', async (req, res) => {
+router.get('/feed', async (req, res) => {
   try {
     const subscriptions = await SubscriptionsRepo.getAllSubscriptions();
 

@@ -9,6 +9,7 @@ const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
 const content = document.getElementById('content');
 const closePlayerBtn = document.getElementById('closePlayer');
+const videoPlayerSubscribeBtn = document.getElementById('videoPlayerSubscribeBtn');
 
 // Global variables / State (App Level)
 let currentVideoId = null;
@@ -140,6 +141,15 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
 
     // Initialize YouTube player using the Player module
     Player.initPlayer(videoId, chapters); // Pass chapters
+
+    // -- Setup Subscribe Button --
+    if (videoPlayerSubscribeBtn) {
+      videoPlayerSubscribeBtn.dataset.channelId = videoDetails.secondary_info?.owner?.author?.id;
+      videoPlayerSubscribeBtn.dataset.channelName = videoDetails.secondary_info?.owner?.author?.name;
+      videoPlayerSubscribeBtn.dataset.channelAvatar = videoDetails.secondary_info?.owner?.author?.thumbnails?.[0]?.url || '';
+      setupSubscribeButton(videoPlayerSubscribeBtn); // Call the setup function
+    }
+    // -- End Setup --
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
@@ -353,3 +363,80 @@ document.addEventListener('DOMContentLoaded', () => {
     console.warn('app.js: electronAPI or onVideoLoadRequest not found. IPC listener not set up.');
   }
 });
+
+// === Subscribe/Unsubscribe Logic ===
+async function setupSubscribeButton(buttonElement) {
+  if (!buttonElement) return;
+
+  const channelId = buttonElement.dataset.channelId;
+  const channelName = buttonElement.dataset.channelName;
+  const channelAvatar = buttonElement.dataset.channelAvatar;
+
+  if (!channelId) {
+    buttonElement.disabled = true;
+    buttonElement.textContent = 'Error';
+    console.error('Subscribe button missing channel ID.');
+    return;
+  }
+
+  // --- Update Button Appearance Function ---
+  const updateButtonAppearance = (isSubscribed) => {
+    if (isSubscribed) {
+      buttonElement.textContent = 'Subscribed';
+      buttonElement.classList.remove('bg-zinc-600', 'hover:bg-zinc-500');
+      buttonElement.classList.add('bg-green-600', 'hover:bg-green-700');
+    } else {
+      buttonElement.textContent = 'Subscribe';
+      buttonElement.classList.remove('bg-green-600', 'hover:bg-green-700');
+      buttonElement.classList.add('bg-zinc-600', 'hover:bg-zinc-500');
+    }
+    buttonElement.disabled = false; // Re-enable after check/action
+  };
+
+  // --- Check Initial Status ---
+  buttonElement.disabled = true; // Disable while checking
+  buttonElement.textContent = '...';
+  try {
+    const response = await fetch(`/api/subscriptions/${channelId}/status`);
+    if (!response.ok) {
+      throw new Error(`Status check failed: ${response.status}`);
+    }
+    const data = await response.json();
+    updateButtonAppearance(data.isSubscribed);
+  } catch (error) {
+    console.error(`Error checking subscription status for ${channelId}:`, error);
+    buttonElement.textContent = 'Error';
+    // Keep disabled if status check fails
+  }
+
+  // --- Add Click Listener ---
+  buttonElement.addEventListener('click', async () => {
+    buttonElement.disabled = true; // Disable during action
+    const isCurrentlySubscribed = buttonElement.textContent === 'Subscribed';
+    const method = isCurrentlySubscribed ? 'DELETE' : 'POST';
+    const url = isCurrentlySubscribed ? `/api/subscriptions/${channelId}` : '/api/subscriptions';
+    const body = isCurrentlySubscribed ? null : JSON.stringify({ channelId, name: channelName, avatarUrl: channelAvatar });
+    const headers = isCurrentlySubscribed ? {} : { 'Content-Type': 'application/json' };
+
+    try {
+      const response = await fetch(url, { method, headers, body });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({})); // Try to get error details
+        throw new Error(`API call failed: ${response.status} - ${errorData.error || 'Unknown error'}`);
+      }
+      // Toggle state on success
+      updateButtonAppearance(!isCurrentlySubscribed);
+      console.info(`${isCurrentlySubscribed ? 'Unsubscribed from' : 'Subscribed to'} ${channelName} (${channelId})`);
+    } catch (error) {
+      console.error(`Error ${isCurrentlySubscribed ? 'unsubscribing' : 'subscribing'} to ${channelId}:`, error);
+      // Optionally revert button text or show temporary error?
+      updateButtonAppearance(isCurrentlySubscribed); // Revert to previous state on error
+      alert(`Failed to ${isCurrentlySubscribed ? 'unsubscribe' : 'subscribe'}. Please try again.`);
+    } finally {
+      // Re-enable button regardless of success/fail, unless status check failed initially
+      if (buttonElement.textContent !== 'Error') {
+        buttonElement.disabled = false;
+      }
+    }
+  });
+}

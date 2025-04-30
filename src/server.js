@@ -46,7 +46,8 @@ app.get('/', (req, res) => {
 app.use('/api/search', searchRouter);
 app.use('/api/video', videoRouter); // Handles /api/video/:id, /api/video/:id/comments, /api/video/:id/recommendations
 app.use('/channel', channelRouter); // Handles /channel/:id, /api/channel/:id, /api/channel/:id/videos
-app.use('/subscriptions', subscriptionsRouter); // Handles /subscriptions page and /api/subscriptions/*, /api/subscriptions/feed, /api/subscriptions/import
+app.use('/subscriptions', subscriptionsRouter); // Handles /subscriptions page ONLY
+app.use('/api/subscriptions', subscriptionsRouter); // Mount for API routes (e.g., /api/subscriptions/feed, /api/subscriptions/:channelId/status)
 app.use('/api/playlists', playlistsRouter); // Handles all /api/playlists/*
 app.use('/api/watch-history', watchHistoryRouter); // Handles all /api/watch-history/*
 app.use('/api/hidden', hiddenContentRouter); // Handles /api/hidden/channels/* and /api/hidden/keywords/*

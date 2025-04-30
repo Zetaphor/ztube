@@ -259,8 +259,6 @@ function createSubscriptionVideoCard(video) {
 
   let publishedText = video.publishedText || 'Unknown date';
 
-  console.log('Video:', video);
-
   // --- Add view count (matching app.js) ---
   const views = video.viewCount || ''; // Get view count if available, default to empty string
   // --- End add view count ---
