@@ -514,6 +514,7 @@ body {
 /* Keep bookmark icon visible if it has the .visible class */
 .thumbnail-icons .bookmark-btn.visible {
   opacity: 1;
+  background-color: #117c38;
 }
 
 .thumbnail-icon-btn {
