@@ -39,19 +39,18 @@ app.set('view engine', 'ejs');
 app.set('views', join(__dirname, '../views'));
 
 app.get('/', (req, res) => {
-  res.render('index');
+  res.render('subscriptions');
 });
 
 // Mount Routers
 app.use('/api/search', searchRouter);
-app.use('/api/video', videoRouter); // Handles /api/video/:id, /api/video/:id/comments, /api/video/:id/recommendations
-app.use('/channel', channelRouter); // Handles /channel/:id, /api/channel/:id, /api/channel/:id/videos
-app.use('/subscriptions', subscriptionsRouter); // Handles /subscriptions page ONLY
-app.use('/api/subscriptions', subscriptionsRouter); // Mount for API routes (e.g., /api/subscriptions/feed, /api/subscriptions/:channelId/status)
-app.use('/api/playlists', playlistsRouter); // Handles all /api/playlists/*
-app.use('/api/watch-history', watchHistoryRouter); // Handles all /api/watch-history/*
-app.use('/api/hidden', hiddenContentRouter); // Handles /api/hidden/channels/* and /api/hidden/keywords/*
-app.use('/api/settings', settingsRouter); // Handles /api/settings/*
+app.use('/api/video', videoRouter);
+app.use('/channel', channelRouter);
+app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/playlists', playlistsRouter);
+app.use('/api/watch-history', watchHistoryRouter);
+app.use('/api/hidden', hiddenContentRouter);
+app.use('/api/settings', settingsRouter);
 
 // Start server
 app.listen(port, () => {

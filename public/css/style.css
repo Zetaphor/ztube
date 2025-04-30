@@ -1,3 +1,7 @@
+body {
+  user-select: none;
+}
+
 #closePlayer {
   width: 36px;
   height: 36px;

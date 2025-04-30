@@ -13,6 +13,7 @@ const allTabContents = document.querySelectorAll('.tab-content');
 
 const refreshFeedButton = document.getElementById('refreshFeedButton');
 const CACHE_KEY = 'subscriptionsFeedCache';
+const CACHE_EXPIRY_MINUTES = 30; // 30 minutes
 
 // --- Lazy Loading Variables ---
 const VIDEOS_PER_PAGE = 25; // Number of videos to load per batch
@@ -28,32 +29,54 @@ document.addEventListener('DOMContentLoaded', () => {
   shortsTab?.addEventListener('click', () => switchTab('shorts'));
 
   // Try loading from cache first
-  const cachedData = localStorage.getItem(CACHE_KEY);
-  let shouldFetch = true;
+  const cachedDataString = localStorage.getItem(CACHE_KEY);
+  let shouldFetch = true; // Assume we need to fetch by default
+  let cacheIsStale = false;
 
-  if (cachedData) {
+  if (cachedDataString) {
     try {
-      const videos = JSON.parse(cachedData);
-      console.info(`Loaded ${videos.length} videos from cache.`);
-      // Display initially in the videos tab
-      allFetchedVideos = videos; // Store cached videos
-      currentVideoIndex = 0; // Reset index
-      displaySubscriptionVideos(); // Start display process (which now includes lazy loading)
-      shouldFetch = false; // Don't fetch immediately if cache is loaded
+      const cachedItem = JSON.parse(cachedDataString);
+      if (cachedItem && cachedItem.data && cachedItem.timestamp) {
+        const cacheAgeMinutes = (Date.now() - cachedItem.timestamp) / (1000 * 60);
+        console.info(`Cache found, age: ${cacheAgeMinutes.toFixed(1)} minutes.`);
+
+        if (cacheAgeMinutes <= CACHE_EXPIRY_MINUTES) {
+          // Cache is valid and not expired
+          console.info(`Loaded ${cachedItem.data.length} videos from valid cache.`);
+          allFetchedVideos = cachedItem.data; // Store cached videos
+          currentVideoIndex = 0; // Reset index
+          displaySubscriptionVideos(); // Start display process
+          shouldFetch = false; // Don't fetch immediately if valid cache is loaded
+        } else {
+          // Cache exists but is stale
+          console.info(`Cache is stale (older than ${CACHE_EXPIRY_MINUTES} minutes). Displaying stale data and fetching fresh.`);
+          allFetchedVideos = cachedItem.data; // Still display stale data
+          currentVideoIndex = 0;
+          displaySubscriptionVideos();
+          shouldFetch = true; // Mark for fetching fresh data
+          cacheIsStale = true; // Flag that we are fetching due to stale cache
+        }
+      } else {
+        // Invalid cache structure
+        console.warn('Invalid cache structure found. Clearing cache.');
+        localStorage.removeItem(CACHE_KEY);
+      }
     } catch (e) {
       console.error('Failed to parse cached subscription data:', e);
       localStorage.removeItem(CACHE_KEY); // Clear invalid cache
     }
+  } else {
+    console.info('No cache found.');
   }
 
   if (shouldFetch) {
-    // Fetch immediately if no valid cache
-    loadSubscriptionFeed(true);
+    // Fetch immediately if no valid cache or if cache was stale
+    loadSubscriptionFeed(true, cacheIsStale); // Pass stale flag
   }
 
   // Add listener for the refresh button
   if (refreshFeedButton) {
-    refreshFeedButton.addEventListener('click', () => loadSubscriptionFeed(true));
+    refreshFeedButton.addEventListener('click', () => loadSubscriptionFeed(true, false)); // Explicit refresh is not due to stale cache
   }
 });
 
@@ -79,16 +102,17 @@ function switchTab(targetTab) {
   });
 }
 
-async function loadSubscriptionFeed(forceFetch = false) {
-  // Parameter forceFetch is now used to signal explicit refresh or initial load without cache
+async function loadSubscriptionFeed(forceFetch = false, dueToStaleCache = false) {
+  // Parameter forceFetch signals explicit refresh or initial load without cache
+  // Parameter dueToStaleCache indicates if fetch is triggered by stale cache
   if (!videosContent) { // Check for the specific video container
     console.error('Subscriptions video content container not found');
     return;
   }
 
-  showLoading();
-  // Keep existing content while loading on refresh, clear only if initial load without cache
-  if (forceFetch && !localStorage.getItem(CACHE_KEY)) {
+  // Only show full "Loading..." overlay if it's an initial load without any cache
+  // or an explicit refresh *not* caused by stale cache (where we already displayed old data)
+  if (forceFetch && !localStorage.getItem(CACHE_KEY) && !dueToStaleCache) {
     videosContent.innerHTML = '<p class="col-span-full text-center text-zinc-500 py-8">Loading videos...</p>';
     // Also potentially clear/reset shorts tab if needed
     if (shortsContent) {
@@ -96,18 +120,25 @@ async function loadSubscriptionFeed(forceFetch = false) {
     }
   }
 
+  // Always show the small loading indicator at the top
+  showLoading();
+
   try {
-    const response = await fetch('/subscriptions/api/feed');
+    const response = await fetch('/api/subscriptions/feed');
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || `Failed to fetch subscription feed: ${response.status}`);
     }
     const videos = await response.json();
 
-    // Cache the new data (contains all items for now)
+    // Cache the new data with timestamp
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(videos));
-      console.info(`Cached ${videos.length} fetched items.`);
+      const itemToCache = {
+        data: videos,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(itemToCache));
+      console.info(`Cached ${videos.length} fetched items with timestamp.`);
     } catch (e) {
       console.error('Failed to cache subscription data:', e);
       // localStorage.removeItem(CACHE_KEY);
@@ -120,8 +151,8 @@ async function loadSubscriptionFeed(forceFetch = false) {
 
   } catch (error) {
     console.error('Failed to load subscription feed:', error);
-    // Show error inline only if we didn't have cached data displayed
-    if (!localStorage.getItem(CACHE_KEY)) {
+    // Show error inline only if we didn't have any data displayed (initial load failed)
+    if (!allFetchedVideos || allFetchedVideos.length === 0) {
       videosContent.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">Error loading subscription feed: ${error.message}</p>`;
     }
     // Always show toast error
