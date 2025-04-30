@@ -453,4 +453,7 @@ body {
   /* Override any default aspect ratio if needed */
 }
 
-/* Adjust close button style if needed (already done in EJS mostly) */
+#closePlayer.theater-mode-active {
+  top: 10px;
+  right: 10px;
+}

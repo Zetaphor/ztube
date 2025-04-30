@@ -293,6 +293,7 @@ function toggleTheaterMode() {
   const videoPlayerDiv = document.getElementById('videoPlayer'); // The main container for player + recommendations
   const mainPlayerContent = document.getElementById('mainPlayerContent');
   const recommendedVideos = document.getElementById('recommendedVideos');
+  const closePlayer = document.getElementById('closePlayer');
   const theaterModeBtn = getTheaterModeBtn();
 
   if (!videoPlayerDiv || !mainPlayerContent || !recommendedVideos || !theaterModeBtn) {
@@ -302,6 +303,7 @@ function toggleTheaterMode() {
 
   // Toggle a class on the parent container
   videoPlayerDiv.classList.toggle('theater-mode-active');
+  closePlayer.classList.toggle('hidden');
 
   if (videoPlayerDiv.classList.contains('theater-mode-active')) {
     // --- Activate Theater Mode ---
@@ -321,9 +323,6 @@ function toggleTheaterMode() {
     mainPlayerContent.classList.add('md:w-2/3'); // Restore default width
     theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>'; // Icon for entering
   }
-
-  // Optional: Trigger resize observer logic if needed, though CSS should handle layout
-  // window.dispatchEvent(new Event('resize')); // Could force reflow
 }
 
 function updateQualityDisplay(quality, qualityBtn) {
