@@ -2,6 +2,10 @@ body {
   user-select: none;
 }
 
+button:focus {
+  outline: none;
+}
+
 #closePlayer {
   width: 36px;
   height: 36px;
