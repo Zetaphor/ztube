@@ -16,27 +16,26 @@ let currentVideoId = null;
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
-  console.log(`app.js: window.loadAndDisplayVideo called for ${videoId}`);
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
-  const mainIndexContentGrid = document.getElementById('content'); // Grid on index page
-  const mainChannelPageContentContainer = document.querySelector('#main-content > main'); // The <main> tag on channel page
+  const mainContentContainer = document.querySelector('#main-content > main'); // The <main> element in all pages
 
   if (!videoPlayerContainer) {
     showError('Video player container not found.');
     return;
   }
 
+  if (!mainContentContainer) {
+    showError('Could not find the main content area (#main-content > main) to hide.');
+    return; // Stop if we can't hide the main content
+  }
+
   try {
     showLoading();
     currentVideoId = videoId;
 
-    // Hide main content grid/container and show player container
-    if (mainIndexContentGrid) {
-      mainIndexContentGrid.classList.add('hidden');
-    } else if (mainChannelPageContentContainer) {
-      // Hide the entire <main> element on the channel page
-      mainChannelPageContentContainer.classList.add('hidden');
-    }
+    // Hide the main content container
+    mainContentContainer.classList.add('hidden');
+
     videoPlayerContainer.classList.remove('hidden');
 
     // --- Get and display date from card immediately ---
@@ -57,11 +56,6 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     }
     const videoDetails = await detailsResponse.json();
 
-    // --- DEBUGGING LOGS (PART 1) ---
-    // console.log("Video Details Received:", JSON.stringify(videoDetails, null, 2));
-    // console.log("Attempting to access avatar URL:", videoDetails?.secondary_info?.owner?.author?.thumbnails?.[0]?.url);
-    // --- END DEBUGGING LOGS (PART 1) ---
-
     const chapters = videoDetails.chapters || []; // Keep chapters data here
 
     // --- Update video info UI (Remains in app.js as it modifies non-player elements) ---
@@ -80,14 +74,8 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
       channelAvatarLink.href = `/channel/${channelIdForLink}`;
     }
 
-    // --- DEBUGGING LOGS (PART 2) ---
-    // console.log("Channel Avatar DOM Element:", channelAvatar);
-    // --- END DEBUGGING LOGS (PART 2) ---
     if (channelAvatar) {
       channelAvatar.src = videoDetails.secondary_info?.owner?.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
-      // --- DEBUGGING LOGS (PART 3) ---
-      // console.log("Set channelAvatar.src to:", channelAvatar.src);
-      // --- END DEBUGGING LOGS (PART 3) ---
     }
 
     // Add Hover Effect Listeners (Remains in app.js)
@@ -189,7 +177,7 @@ document.addEventListener('playerInitFailed', (event) => {
 // Initialize YouTube player API (Required by YT library)
 // This function needs to be global for the YouTube API callback
 window.onYouTubeIframeAPIReady = function () {
-  console.log("app.js: YouTube Iframe API Ready.");
+  console.info("app.js: YouTube Iframe API Ready.");
 }
 
 // --- App Level Functions --- (Search, Comments, Recommendations, etc.)
@@ -307,21 +295,20 @@ async function playVideo(videoId, videoCardElement) {
 
 // App-level function to handle closing the player
 function closeVideoPlayer() {
-  console.log("app.js: closeVideoPlayer called");
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
-  const mainIndexContentGrid = document.getElementById('content'); // Grid on index page
-  const mainChannelPageContentContainer = document.querySelector('#main-content > main'); // The <main> tag on channel page
+  const mainContentContainer = document.querySelector('#main-content > main'); // The <main> element in all pages
 
   Player.destroyPlayer(); // Call the player module's destroy function
 
-  // Hide player container and show main content grid/container
+  // Hide player container
   if (videoPlayerContainer) videoPlayerContainer.classList.add('hidden');
 
-  if (mainIndexContentGrid) {
-    mainIndexContentGrid.classList.remove('hidden');
-  } else if (mainChannelPageContentContainer) {
-    // Show the <main> element again on the channel page
-    mainChannelPageContentContainer.classList.remove('hidden');
+  // Show the main content container
+  if (mainContentContainer) {
+    mainContentContainer.classList.remove('hidden');
+  } else {
+    // This case should ideally not happen now with consistent structure
+    console.error(`closeVideoPlayer: Could not find the main content container (#main-content > main) to show!`);
   }
 
   // Clear app-specific state related to the video
@@ -340,7 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const content = document.getElementById('content');
 
   if (queryParam && searchInput && content) {
-    console.log('Found query parameter, performing search:', queryParam);
     searchInput.value = queryParam;
     performSearch();
   }
@@ -348,9 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add IPC Listener (Remains in app.js)
   if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
     window.electronAPI.onVideoLoadRequest((videoId) => {
-      console.log(`app.js: IPC Listener CALLBACK triggered with videoId: ${videoId}`);
+      console.info(`app.js: IPC Listener CALLBACK triggered with videoId: ${videoId}`);
       if (videoId && typeof videoId === 'string') {
-        console.log(`app.js: Calling window.loadAndDisplayVideo via IPC with ID: ${videoId}`);
+        console.info(`app.js: Calling window.loadAndDisplayVideo via IPC with ID: ${videoId}`);
         try {
           // Call the global function, passing null for the element
           window.loadAndDisplayVideo(videoId, null);

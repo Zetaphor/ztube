@@ -27,13 +27,10 @@ function createVideoCard(video) {
 
   // When clicking a video card on the channel page, call the global loadAndDisplayVideo
   card.onclick = () => {
-    console.log(`Channel page: Requesting video play: ${video.id}`);
     if (typeof window.loadAndDisplayVideo === 'function') {
       window.loadAndDisplayVideo(video.id, card); // Pass the video ID and the card element
     } else {
       console.error('loadAndDisplayVideo function not found. Ensure app.js is loaded correctly.');
-      // Fallback or error display?
-      // Maybe redirect: window.location.href = `/?videoId=${video.id}`;
     }
   };
 
@@ -184,8 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Extract channel ID from the global channelData object set in EJS
   if (typeof channelData !== 'undefined' && channelData.id) {
     currentChannelId = channelData.id;
-    console.log('Channel JS Initialized for ID:', currentChannelId);
-    console.log('Channel JS: Checking window.loadAndDisplayVideo on DOMContentLoaded:', typeof window.loadAndDisplayVideo);
 
     // Add data attributes and event listeners to tabs
     tabs.forEach(tab => {

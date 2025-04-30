@@ -20,7 +20,6 @@ function extractVideoId(url) {
 
 // Start the Express server as a separate Node.js process
 function startServer() {
-  console.log('Starting server process...');
 
   // Use the correct path to the server file
   const serverPath = path.join(__dirname, 'src', 'server.js');
@@ -35,7 +34,7 @@ function startServer() {
   });
 
   serverProcess.on('close', (code) => {
-    console.log(`Server process exited with code ${code}`);
+    console.info(`Server process exited with code ${code}`);
   });
 }
 
@@ -59,23 +58,23 @@ function createWindow() {
 
   // --- Replace 'new-window' listener with setWindowOpenHandler ---
   mainWindow.webContents.setWindowOpenHandler(({ url, disposition, features, frameName, referrer, postBody }) => {
-    console.log(`[Main Process] setWindowOpenHandler intercepted request for URL: ${url}`);
-    console.log(`[Main Process] Disposition: ${disposition}`); // Log disposition (e.g., 'new-window', 'foreground-tab')
+    console.info(`[Main Process] setWindowOpenHandler intercepted request for URL: ${url}`);
+    console.info(`[Main Process] Disposition: ${disposition}`); // Log disposition (e.g., 'new-window', 'foreground-tab')
 
     const videoId = extractVideoId(url);
 
     if (videoId) {
-      console.log(`[Main Process] Detected YouTube video link. ID: ${videoId}. Denying new window and sending IPC.`);
+      console.info(`[Main Process] Detected YouTube video link. ID: ${videoId}. Denying new window and sending IPC.`);
       // Send video ID to the renderer process to load it internally
       mainWindow.webContents.send('load-video-from-main', videoId);
       // Deny Electron from creating a new window
       return { action: 'deny' };
     } else {
-      console.log('[Main Process] URL is not a YouTube video link. Opening externally.');
+      console.info('[Main Process] URL is not a YouTube video link. Opening externally.');
       // For all other links, open in the default browser
       try {
         shell.openExternal(url);
-        console.log(`[Main Process] Called shell.openExternal for: ${url}`);
+        console.info(`[Main Process] Called shell.openExternal for: ${url}`);
       } catch (e) {
         console.error(`[Main Process] Error calling shell.openExternal for ${url}:`, e);
       }
@@ -131,7 +130,6 @@ app.on('window-all-closed', () => {
 // Clean up the server process when the app is quitting
 app.on('quit', () => {
   if (serverProcess) {
-    console.log('Terminating server process...');
     if (process.platform === 'win32') {
       // On Windows, we need to kill the process group
       spawn('taskkill', ['/pid', serverProcess.pid, '/f', '/t']);

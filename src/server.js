@@ -93,52 +93,47 @@ app.get('/api/video/:id', async (req, res) => {
     let markersMap = null;
 
     try {
-      console.log('Attempting to extract chapters...');
-
-      const decoratedPlayerBar = video.player_overlays?.decorated_player_bar;
-      const playerBar = decoratedPlayerBar?.player_bar;
-      markersMap = playerBar?.markers_map;
+      // Safely access nested properties using optional chaining (?.)
+      markersMap = video.player_overlays?.decorated_player_bar?.player_bar?.markers_map;
 
       // --- Process the found markersMap ---
       if (markersMap && Array.isArray(markersMap)) {
-        console.log(`Found markersMap with ${markersMap.length} items.`);
+        console.info(`Found markersMap with ${markersMap.length} items.`);
         // Find the marker group with the key "DESCRIPTION_CHAPTERS"
         const chapterMarkerGroup = markersMap.find(group => group.marker_key === 'DESCRIPTION_CHAPTERS');
 
-        if (chapterMarkerGroup && chapterMarkerGroup.value?.chapters && Array.isArray(chapterMarkerGroup.value.chapters)) {
+        if (chapterMarkerGroup?.value?.chapters && Array.isArray(chapterMarkerGroup.value.chapters)) {
           const chapterList = chapterMarkerGroup.value.chapters;
-          console.log(`Found chapters list with ${chapterList.length} chapters.`);
+          console.info(`Found chapters list with ${chapterList.length} chapters.`);
           chapters = chapterList
             .map((chapter, index) => {
-              // Extract title using the correct path: chapter.title.text
-              const title = chapter.title?.text;
-              // Extract startTimeMs directly from chapter object
-              const startTimeMs = chapter.time_range_start_millis;
-              // Extract the first thumbnail URL
-              const thumbnailUrl = chapter.thumbnail?.[0]?.url;
+              // Safely access potentially missing nested properties
+              const title = chapter?.title?.text;
+              const startTimeMs = chapter?.time_range_start_millis;
+              const thumbnailUrl = chapter?.thumbnail?.[0]?.url;
 
               if (typeof title !== 'string' || typeof startTimeMs !== 'number') {
-                console.warn(`Invalid data in chapter at index ${index}: title=${title}, startTimeMs=${startTimeMs}`);
+                console.warn(`Invalid or missing data in chapter object at index ${index}:`, chapter); // Log the whole chapter object for debugging
                 return null;
               }
 
               return {
-                title: title || `Chapter ${index + 1}`,
+                title: title,
                 startTimeSeconds: startTimeMs / 1000,
                 thumbnailUrl: thumbnailUrl || null,
               };
             })
             .filter(chapter => chapter !== null)
             .sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
-          console.log(`Successfully extracted ${chapters.length} chapters.`);
         } else {
-          console.log('Could not find marker group with key "DESCRIPTION_CHAPTERS" or it lacks a valid "value.chapters" array.');
+          console.warn('Could not find marker group with key "DESCRIPTION_CHAPTERS" or it lacks a valid "value.chapters" array.');
         }
       } else {
-        console.log('Could not find a valid markersMap array at player_overlays.decorated_player_bar.player_bar.markers_map.');
+        console.warn('No valid markersMap array found for chapter extraction.'); // Updated log message
       }
     } catch (e) {
       console.error("Error during chapter extraction:", e);
+      chapters = []; // Ensure chapters is empty on error
     }
 
     const videoDetails = {
@@ -223,7 +218,7 @@ app.get('/api/comments/:id', async (req, res) => {
 
     // Check if we have valid comments data
     if (!commentsData || !commentsData.contents) {
-      console.log('No comments data found');
+      console.warn('No comments data found');
       return res.json({
         comments: [],
         continuation: null
@@ -275,15 +270,12 @@ app.get('/api/video/:id/recommendations', async (req, res) => {
     let resultsNodes = [];
     if (Array.isArray(infoResponse.watch_next_feed)) {
       resultsNodes = infoResponse.watch_next_feed;
-      console.log('Found recommendations in infoResponse.watch_next_feed');
     } else {
-      console.log(`Could not find recommendations array at infoResponse.watch_next_feed for ${id}`);
+      console.warn(`Could not find recommendations array at infoResponse.watch_next_feed for ${id}`);
     }
 
     // Filter these nodes to get only video recommendations (e.g., CompactVideo)
     const recommendedVideoNodes = resultsNodes.filter(node => node.is(YTNodes.CompactVideo) || node.constructor.name === 'CompactVideoRenderer') || [];
-
-    console.log(`Recommendations extraction: Found ${recommendedVideoNodes.length} potential video nodes for ${id}.`);
 
     const recommendations = recommendedVideoNodes.map(video => {
       // Adapt mapping based on the actual node type (CompactVideo)
@@ -390,13 +382,6 @@ app.get('/channel/:id', async (req, res) => {
       videoCount = headerContent.metadata.metadata_rows[1].metadata_parts[1]?.text?.text || '';
     }
 
-    // Final check logs
-    console.log('Final Extracted Name:', channelName);
-    console.log('Final Extracted Avatar URL:', avatarUrl);
-    console.log('Final Extracted Banner URL:', bannerUrl);
-    console.log('Final Extracted Subscriber Count:', subscriberCount);
-    console.log('Final Extracted Video Count:', videoCount);
-
     const channelData = {
       id: id,
       name: channelName,
@@ -427,7 +412,6 @@ app.get('/api/channel/:id/videos', async (req, res) => {
       // Note: youtubei.js might handle continuations differently depending on context.
       // This assumes getting the full channel object again and then applying continuation,
       // which might not be the most efficient way. A more direct continuation fetch might exist.
-      console.log(`Fetching continuation for channel ${id}`);
       // Re-fetch channel to potentially get continuation context if needed
       const channel = await youtube.getChannel(id);
       // You might need a more specific method if getVideos() doesn't accept continuation directly
@@ -438,7 +422,6 @@ app.get('/api/channel/:id/videos', async (req, res) => {
 
     } else {
       // Initial load: Get the channel and its first batch of videos
-      console.log(`Fetching initial videos for channel ${id}`);
       const channel = await youtube.getChannel(id);
       // Attempt to switch to the videos tab explicitly if possible/needed
       // This depends on whether getChannel lands on the featured tab or videos tab by default
@@ -482,9 +465,8 @@ app.get('/api/channel/:id/videos', async (req, res) => {
 // --- NEW: Subscriptions Feed Aggregation ---
 app.get('/api/subscriptions/feed', async (req, res) => {
   try {
-    console.log("Fetching subscriptions feed...");
     const subscriptions = await SubscriptionsRepo.getAllSubscriptions();
-    console.log(`Found ${subscriptions.length} subscriptions.`);
+    console.info(`Found ${subscriptions.length} subscriptions.`);
 
     if (subscriptions.length === 0) {
       return res.json([]); // Return empty if no subscriptions
@@ -498,7 +480,6 @@ app.get('/api/subscriptions/feed', async (req, res) => {
 
     const feedPromises = subscriptions.map(async (sub) => {
       const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${sub.channel_id}`;
-      console.log(`Fetching feed for ${sub.name} (${sub.channel_id}) from ${feedUrl}`);
       try {
         const response = await fetch(feedUrl);
         if (!response.ok) {
@@ -545,8 +526,6 @@ app.get('/api/subscriptions/feed', async (req, res) => {
 
     // Sort by published date (descending)
     allVideos.sort((a, b) => new Date(b.published) - new Date(a.published));
-
-    console.log(`Returning ${allVideos.length} aggregated videos.`);
     res.json(allVideos);
 
   } catch (error) {
@@ -652,13 +631,12 @@ app.post('/api/subscriptions/import', upload.single('subscriptionsCsv'), async (
       }
     })
     .on('end', async () => {
-      console.log(`CSV parsing finished. Found ${records.length} valid records.`);
+      console.info(`CSV parsing finished. Found ${records.length} valid records.`);
       for (const record of records) {
         try {
           // Fetch channel details to get the avatar
           let avatarUrl = null;
           try {
-            console.log(`Fetching details for channel: ${record.channelId} (${record.name})`);
             const channel = await youtube.getChannel(record.channelId);
             // Extract avatar URL - adapt logic based on getChannel response structure
             // (Similar logic to the /channel/:id route might be needed)
@@ -676,10 +654,7 @@ app.post('/api/subscriptions/import', upload.single('subscriptionsCsv'), async (
 
             if (!avatarUrl) {
               console.warn(`Could not find avatar for channel ${record.channelId} (${record.name}). Proceeding without it.`);
-            } else {
-              console.log(`Found avatar for ${record.channelId}: ${avatarUrl}`);
             }
-
           } catch (channelError) {
             console.error(`Error fetching channel details for ${record.channelId} (${record.name}):`, channelError.message);
             // Continue import without avatar if fetching fails
@@ -695,7 +670,7 @@ app.post('/api/subscriptions/import', upload.single('subscriptionsCsv'), async (
         }
       }
 
-      console.log(`Import process finished. Imported ${importedCount} subscriptions.`);
+      console.info(`Import process finished. Imported ${importedCount} subscriptions.`);
 
       if (errors.length > 0) {
         res.status(207).json({
@@ -1037,5 +1012,5 @@ app.delete('/api/hidden/keywords', async (req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.info(`Server running at http://localhost:${port}`);
 });

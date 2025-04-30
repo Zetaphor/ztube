@@ -167,7 +167,6 @@ async function fetchAndDisplayComments(videoId, continuation = null) {
  * @param {string} videoId - The YouTube video ID.
  */
 export function initComments(videoId) {
-  console.log(`Comments Module: Initializing for videoId: ${videoId}`);
   // Store references to the DOM elements
   commentsListElement = getCommentsList(); // Use getter which falls back to getElementById
   loadMoreButtonElement = getLoadMoreButton();
@@ -193,12 +192,9 @@ export function initComments(videoId) {
       if (commentsNextPage) {
         fetchAndDisplayComments(currentVideoId, commentsNextPage); // Use stored videoId and next page token
       } else {
-        console.log("Comments Module: Load more clicked, but no next page token available.");
       }
     });
-    console.log("Comments Module: 'Load More' listener attached.");
   } else {
-    console.error("Comments Module: Failed to re-attach listener to 'Load More' button after cloning.");
   }
 }
 
@@ -206,7 +202,6 @@ export function initComments(videoId) {
  * Clears the comments list UI and resets module state.
  */
 export function clearComments() {
-  console.log("Comments Module: Clearing comments UI and state.");
   const commentsList = getCommentsList();
   const loadMoreComments = getLoadMoreButton();
 

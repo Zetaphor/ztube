@@ -3,8 +3,6 @@
 
 import { showError, showLoading, hideLoading } from './utils.js';
 
-console.log("Subscriptions page JS loaded.");
-
 // Tab elements and content containers
 const videosTab = document.getElementById('videosTab');
 const shortsTab = document.getElementById('shortsTab');
@@ -28,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (cachedData) {
     try {
       const videos = JSON.parse(cachedData);
-      console.log(`Loaded ${videos.length} videos from cache.`);
+      console.info(`Loaded ${videos.length} videos from cache.`);
       // Display initially in the videos tab
       displaySubscriptionVideos(videos);
       shouldFetch = false; // Don't fetch immediately if cache is loaded
@@ -50,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function switchTab(targetTab) {
-  console.log(`Switching to tab: ${targetTab}`);
   allTabButtons.forEach(button => {
     if (button.dataset.tab === targetTab) {
       button.classList.remove('border-transparent', 'text-zinc-400', 'hover:text-zinc-200', 'hover:border-zinc-300');
@@ -79,7 +76,6 @@ async function loadSubscriptionFeed(forceFetch = false) {
     return;
   }
 
-  console.log(`Loading subscription feed. Force fetch: ${forceFetch}`);
   showLoading();
   // Keep existing content while loading on refresh, clear only if initial load without cache
   if (forceFetch && !localStorage.getItem(CACHE_KEY)) {
@@ -101,7 +97,7 @@ async function loadSubscriptionFeed(forceFetch = false) {
     // Cache the new data (contains all items for now)
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(videos));
-      console.log(`Cached ${videos.length} fetched items.`);
+      console.info(`Cached ${videos.length} fetched items.`);
     } catch (e) {
       console.error('Failed to cache subscription data:', e);
       // localStorage.removeItem(CACHE_KEY);

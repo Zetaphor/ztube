@@ -63,7 +63,7 @@ function onPlayerReady(event) {
   if (ytPlayer && typeof ytPlayer.getPlaybackQuality === 'function') {
     const qualityBtn = getQualityBtn();
     const currentQuality = ytPlayer.getPlaybackQuality();
-    console.log("Initial quality:", currentQuality);
+    console.info("Initial quality:", currentQuality);
     updateQualityDisplay(currentQuality, qualityBtn); // Pass qualityBtn
   }
 
@@ -114,11 +114,12 @@ function onPlayerStateChange(event) {
 function onPlayerError(event) {
   // Note: We might want to bubble this up or dispatch a custom event
   // For now, just log it. The main app can handle showError.
+  console.error('YT Player Error (onPlayerError):', event.data); // Log the specific error code
   SponsorBlock.clearSponsorSegmentsState();
 }
 
 function onPlaybackQualityChange(event) {
-  console.log("Playback quality changed to:", event.data);
+  console.info("Playback quality changed to:", event.data);
   const qualityBtn = getQualityBtn();
   updateQualityDisplay(event.data, qualityBtn);
 }
@@ -447,7 +448,6 @@ function displayChapters(chapters) {
     return;
   }
 
-  console.log(`Player Module: Displaying ${chapters.length} chapters.`);
   chaptersAccordion.classList.remove('hidden');
 
   const sortedChapters = [...chapters].sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
@@ -736,12 +736,14 @@ export function initPlayer(videoId, initialChapters = []) {
       }
     });
   } catch (error) {
-    console.error("Player Module: Error creating YT.Player instance:", error);
-    // Attempt cleanup even if creation failed
+    console.error("Player Module Error: Failed to create YT.Player instance:", error);
+    SponsorBlock.clearSponsorSegmentsState();
+    clearChapterDisplay();
+    // Also dispatch event here
+    console.error("Player Module: Dispatching playerInitFailed due to creation error."); // Add log before dispatch
+    document.dispatchEvent(new CustomEvent('playerInitFailed', { detail: error.message || 'Failed to create player' }));
+    // Attempt cleanup even on creation error
     destroyPlayer();
-    // Maybe show an error to the user via app.js?
-    document.dispatchEvent(new CustomEvent('playerInitFailed', { detail: error }));
-    return; // Stop execution
   }
 
 
