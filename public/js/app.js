@@ -223,17 +223,18 @@ async function performSearch() {
   const query = searchInput.value.trim();
   if (!query) return;
 
-  const mainContentElement = document.getElementById('content');
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get player container
 
-  // --- Added Check ---
   // If the player is currently visible, close it first
   if (videoPlayerContainer && !videoPlayerContainer.classList.contains('hidden')) {
     closeVideoPlayer();
   }
-  // --- End Added Check ---
 
-  if (mainContentElement) {
+  // --- Find the main content area --- a <main> tag inside #main-content
+  const mainContentArea = document.querySelector('#main-content > main');
+  // --- End Find Main Area ---
+
+  if (mainContentArea) {
     try {
       showLoading();
       const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
@@ -242,31 +243,45 @@ async function performSearch() {
         throw new Error(errorData.error || `Search failed: ${response.status}`);
       }
       const data = await response.json();
-      displayResults(data, mainContentElement);
+      // Display results within the main content area
+      displayResults(data, mainContentArea);
     } catch (error) {
       console.error('Search error:', error);
-      mainContentElement.innerHTML = `<div class="col-span-full text-center py-10 text-red-600">${error.message || 'Search failed. Please try again.'}</div>`;
+      // Display error within the main content area, replacing its content
+      mainContentArea.innerHTML = `<div class="col-span-full text-center py-10 text-red-600">${error.message || 'Search failed. Please try again.'}</div>`;
       showError(error.message || 'Search failed. Please try again.');
     } finally {
       hideLoading();
     }
   } else {
+    // Fallback: If no main content area found, redirect to index search
+    console.warn("Could not find the main content area (#main-content > main). Redirecting to index search.");
     window.location.href = `/?query=${encodeURIComponent(query)}`;
   }
 }
 
-function displayResults(results, targetElement) {
-  targetElement.innerHTML = '';
+function displayResults(results, mainContentElement) {
+  // Clear the main content element
+  mainContentElement.innerHTML = '';
+  // Remove any specific layout classes from the main element itself if necessary
+  mainContentElement.className = 'container mx-auto p-4 flex-grow'; // Reset to default main classes
+
+  // Create the grid container *inside* the main element
+  const gridContainer = document.createElement('div');
+  gridContainer.id = 'content'; // Give it the ID used by index page for consistency
+  gridContainer.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4'; // Standard search grid
 
   if (!results || !results.length) {
-    targetElement.innerHTML = '<div class="col-span-full text-center py-10 text-gray-600">No results found</div>';
-    return;
+    gridContainer.innerHTML = '<div class="col-span-full text-center py-10 text-zinc-500">No results found</div>';
+  } else {
+    results.forEach(video => {
+      const card = createVideoCard(video); // Use existing card creation
+      gridContainer.appendChild(card);
+    });
   }
 
-  results.forEach(video => {
-    const card = createVideoCard(video);
-    targetElement.appendChild(card);
-  });
+  // Append the new grid container to the main content element
+  mainContentElement.appendChild(gridContainer);
 }
 
 function createVideoCard(video) {
