@@ -198,6 +198,14 @@ async function performSearch() {
   if (!query) return;
 
   const mainContentElement = document.getElementById('content');
+  const videoPlayerContainer = document.getElementById('videoPlayer'); // Get player container
+
+  // --- Added Check ---
+  // If the player is currently visible, close it first
+  if (videoPlayerContainer && !videoPlayerContainer.classList.contains('hidden')) {
+    closeVideoPlayer();
+  }
+  // --- End Added Check ---
 
   if (mainContentElement) {
     try {
