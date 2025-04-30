@@ -53,11 +53,6 @@
   font-size: 14px;
 }
 
-.video-meta span+span::before {
-  content: "•";
-  margin: 0 4px;
-}
-
 /* Loading animation */
 .loading {
   position: fixed;
@@ -375,11 +370,6 @@
   line-height: 1rem;
 }
 
-.recommended-meta span+span::before {
-  content: "•";
-  margin: 0 4px;
-}
-
 /* End Recommended Videos Sidebar */
 
 /* Chapter Markers on Progress Bar */
@@ -533,6 +523,11 @@
 
 #videoPlayer.theater-mode .quality-controls {
   max-width: 50px !important;
+}
+
+#chaptersHeader.theater-mode {
+  padding-bottom: 0.3rem !important;
+  padding-top: 0.3rem !important;
 }
 
 /* Add styles for Quality Controls */
