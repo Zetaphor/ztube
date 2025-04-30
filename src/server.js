@@ -42,6 +42,16 @@ app.get('/', (req, res) => {
   res.render('subscriptions');
 });
 
+// Route for listing all playlists
+app.get('/playlists', (req, res) => {
+  res.render('playlists');
+});
+
+// Route for viewing a specific playlist
+app.get('/playlists/:id', (req, res) => {
+  res.render('playlistDetail', { playlistId: req.params.id });
+});
+
 // Mount Routers
 app.use('/api/search', searchRouter);
 app.use('/api/video', videoRouter);

@@ -3,6 +3,7 @@ import * as SponsorBlock from './sponsorblock.js';
 import * as Player from './player.js';
 import * as Recommended from './recommended.js';
 import * as Comments from './comments.js';
+import './addToPlaylist.js'; // Import the new module to register the global function
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
@@ -10,9 +11,11 @@ const searchButton = document.getElementById('searchButton');
 const content = document.getElementById('content');
 const closePlayerBtn = document.getElementById('closePlayer');
 const videoPlayerSubscribeBtn = document.getElementById('videoPlayerSubscribeBtn');
+const videoPlayerAddToPlaylistBtn = document.getElementById('addToPlaylistBtnPlayer'); // Get the new button
 
 // Global variables / State (App Level)
 let currentVideoId = null;
+let currentVideoDetailsForPlaylist = {}; // Store details needed for adding to playlist
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
@@ -58,6 +61,14 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     const videoDetails = await detailsResponse.json();
 
     const chapters = videoDetails.chapters || []; // Keep chapters data here
+
+    // Store details needed for the add to playlist button
+    currentVideoDetailsForPlaylist = {
+      videoId: videoId,
+      videoTitle: videoDetails.title || 'Unknown',
+      channelName: videoDetails.secondary_info?.owner?.author?.name || 'Unknown',
+      thumbnailUrl: videoDetails.primary_info?.thumbnail?.url || 'img/default-video.png' // Need a thumbnail
+    };
 
     // --- Update video info UI (Remains in app.js as it modifies non-player elements) ---
     const videoTitle = document.getElementById('videoTitle');
@@ -177,11 +188,26 @@ if (closePlayerBtn) {
 // Listener for player close request (e.g., Escape key in player module)
 document.addEventListener('closePlayerRequest', closeVideoPlayer);
 
+// Listener for the player's Add to Playlist button
+if (videoPlayerAddToPlaylistBtn) {
+  videoPlayerAddToPlaylistBtn.addEventListener('click', () => {
+    if (window.handleAddToPlaylistClick && currentVideoDetailsForPlaylist.videoId) {
+      window.handleAddToPlaylistClick(currentVideoDetailsForPlaylist);
+    } else {
+      console.error("Add to Playlist handler not found or video details missing.");
+      showError("Could not initiate add to playlist.");
+    }
+  });
+}
+
 // Listener for player init failed event
 document.addEventListener('playerInitFailed', (event) => {
   console.error("app.js: Received playerInitFailed event", event.detail);
   showError('Failed to initialize video player. Please try again.');
   closeVideoPlayer(); // Ensure cleanup
+  currentVideoId = null;
+  currentVideoDetailsForPlaylist = {}; // Clear playlist details too
+  Comments.clearComments(); // Call the module's clear function
 });
 
 // Initialize YouTube player API (Required by YT library)
@@ -245,26 +271,30 @@ function displayResults(results, targetElement) {
 
 function createVideoCard(video) {
   const card = document.createElement('div');
-  card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105';
+  card.className = 'video-card group bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105 relative';
 
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
   let duration = video.duration || '';
   let views = video.viewCount || '';
   let uploadedAt = video.uploadedAt || '';
+  const videoTitle = video.title || 'Untitled';
+  const channelNameText = video.channel?.name || 'Unknown';
 
+  card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
+  card.dataset.videoTitle = videoTitle;
+  card.dataset.channelName = channelNameText;
+  card.dataset.thumbnailUrl = thumbnail;
 
-  // Check if it looks like a livestream
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
 
   if (isLivestream) {
-    uploadedAt = ''; // Don't show upload date for livestreams
-    duration = '🔴 LIVE'; // Set duration text for live
+    uploadedAt = '';
+    duration = '🔴 LIVE';
   }
 
   card.onclick = () => window.loadAndDisplayVideo(video.id, card);
 
-  const channelNameText = video.channel?.name || 'Unknown';
   const channelId = video.channel?.id;
   const verifiedBadge = video.channel?.verified ?
     '<i class="fas fa-check-circle text-green-500 ml-1 text-xs" title="Verified Channel"></i>' :
@@ -276,13 +306,12 @@ function createVideoCard(video) {
 
   const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
 
-  // Build meta HTML string separately
   let metaHTML = '';
   if (views) {
     metaHTML += `<span>${views}</span>`;
   }
   if (views && uploadedAt) {
-    metaHTML += '<span class="separator">•</span>'; // Add separator if both exist
+    metaHTML += '<span class="separator">•</span>';
   }
   if (uploadedAt) {
     metaHTML += `<span>${uploadedAt}</span>`;
@@ -290,11 +319,11 @@ function createVideoCard(video) {
 
   card.innerHTML = `
         <div class="video-thumbnail relative">
-            <img src="${thumbnail}" alt="${video.title || 'Video thumbnail'}" loading="lazy" class="w-full h-full object-cover aspect-video">
+            <img src="${thumbnail}" alt="${videoTitle} thumbnail" loading="lazy" class="w-full h-full object-cover aspect-video">
             ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''}
         </div>
         <div class="p-3">
-            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${video.title || 'Untitled'}</h3>
+            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${videoTitle}</h3>
             <div class="flex items-center mt-1">
                 <a href="${channelId ? `/channel/${channelId}` : '#'}" class="flex-shrink-0 mr-2" onclick="event.stopPropagation();">
                     <img src="${channelAvatarUrl}" alt="${channelNameText} avatar" class="w-8 h-8 rounded-full">
@@ -309,7 +338,24 @@ function createVideoCard(video) {
                 </div>
             </div>
         </div>
+        <!-- Add to Playlist Button (Hidden by default, shown on group-hover) -->
+        <button class="add-to-playlist-btn absolute top-1 right-1 bg-zinc-800/80 hover:bg-green-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10" title="Add to Playlist">
+            <i class="fas fa-plus"></i>
+        </button>
     `;
+
+  const addToPlaylistBtn = card.querySelector('.add-to-playlist-btn');
+  if (addToPlaylistBtn) {
+    addToPlaylistBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.handleAddToPlaylistClick) {
+        window.handleAddToPlaylistClick(card.dataset);
+      } else {
+        console.error("handleAddToPlaylistClick function not found.");
+        alert("Add to playlist functionality not available yet.");
+      }
+    });
+  }
 
   return card;
 }
@@ -339,6 +385,7 @@ function closeVideoPlayer() {
 
   // Clear app-specific state related to the video
   currentVideoId = null;
+  currentVideoDetailsForPlaylist = {}; // Clear playlist details too
   // commentsNextPage = null; // State moved to Comments module
   Comments.clearComments(); // Call the module's clear function
 

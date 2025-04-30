@@ -13,17 +13,23 @@ let videosContinuation = null;
 
 function createVideoCard(video) {
   const card = document.createElement('div');
-  // Add a class to distinguish channel video cards if needed, or reuse existing style
-  card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer';
+  // Add group for hover effect on button
+  card.className = 'video-card group bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer relative'; // Added relative
 
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
   const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
   let duration = video.duration || '0:00';
   let views = video.viewCount || '0 views';
   let uploadedAt = video.uploadedAt || 'Unknown date';
+  const videoTitle = video.title || 'Untitled'; // Store title
+  const channelNameText = video.channel?.name || 'Unknown'; // Store channel name
 
+  // Add video data to dataset
   card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
+  card.dataset.videoTitle = videoTitle;
+  card.dataset.channelName = channelNameText;
+  card.dataset.thumbnailUrl = thumbnail;
 
   // Check if it looks like a livestream
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
@@ -42,7 +48,6 @@ function createVideoCard(video) {
     }
   };
 
-  const channelNameText = video.channel?.name || 'Unknown';
   const channelId = video.channel?.id;
   const verifiedBadge = video.channel?.verified ?
     '<i class="fas fa-check-circle text-green-500 ml-1 text-xs" title="Verified Channel"></i>' :
@@ -56,11 +61,11 @@ function createVideoCard(video) {
 
   card.innerHTML = `
         <div class="video-thumbnail relative">
-            <img src="${thumbnail}" alt="${video.title}" loading="lazy" class="w-full h-full object-cover aspect-video">
+            <img src="${thumbnail}" alt="${videoTitle}" loading="lazy" class="w-full h-full object-cover aspect-video">
             ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''}
         </div>
         <div class="p-3">
-            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${video.title || 'Untitled'}</h3>
+            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${videoTitle}</h3>
             <div class="flex items-center mt-1">
                 <!-- Hide avatar/channel name inside the card when on channel page -->
                 <!--
@@ -78,7 +83,27 @@ function createVideoCard(video) {
                  </div>
             </div>
         </div>
+        <!-- Add to Playlist Button (Hidden by default, shown on group-hover) -->
+        <button class="add-to-playlist-btn absolute top-1 right-1 bg-zinc-800/80 hover:bg-green-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10" title="Add to Playlist">
+            <i class="fas fa-plus"></i>
+        </button>
     `;
+
+  // Add listener for the new button
+  const addToPlaylistBtn = card.querySelector('.add-to-playlist-btn');
+  if (addToPlaylistBtn) {
+    addToPlaylistBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent card click (playing video)
+      // Call the global add to playlist function (will be defined later)
+      if (window.handleAddToPlaylistClick) {
+        window.handleAddToPlaylistClick(card.dataset);
+      } else {
+        console.error("handleAddToPlaylistClick function not found.");
+        alert("Add to playlist functionality not available yet.");
+      }
+    });
+  }
+
   return card;
 }
 
