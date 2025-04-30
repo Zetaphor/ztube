@@ -35,19 +35,16 @@ const getQualityBtn = () => getElement('qualityBtn');
 
 // === Event Handlers (Private) ===
 function onPlayerReady(event) {
-  console.log("Player Module: onPlayerReady triggered.");
   const customControls = getCustomControls();
 
   // Re-enable controls
   if (customControls) {
-    console.log("Player Module: Re-enabling custom controls.");
     customControls.classList.remove('pointer-events-none', 'opacity-50');
   }
 
   // Setup Controls and Key Listener
   setupCustomControls(); // Attaches listeners
   if (!keydownAttached) {
-    console.log("Player Module: Attaching keydown listener.");
     document.addEventListener('keydown', handleKeydown);
     keydownAttached = true;
   }
@@ -80,7 +77,6 @@ function onPlayerReady(event) {
   }, 1000);
 
   SponsorBlock.setPlayerInstance(event.target);
-  console.log("Player Module: onPlayerReady setup complete.");
 }
 
 function onPlayerStateChange(event) {
@@ -117,7 +113,6 @@ function onPlayerStateChange(event) {
 }
 
 function onPlayerError(event) {
-  console.error('YouTube player error (Player Module):', event.data);
   // Note: We might want to bubble this up or dispatch a custom event
   // For now, just log it. The main app can handle showError.
   SponsorBlock.clearSponsorSegmentsState();
@@ -681,8 +676,6 @@ function setupCustomControls() {
   if (fullscreenBtn) fullscreenBtn.onclick = toggleFullscreen;
   if (theaterModeBtn) theaterModeBtn.onclick = toggleTheaterMode;
   if (chaptersHeader) chaptersHeader.onclick = toggleChaptersAccordion;
-
-  console.log("Player Module: Custom controls listeners attached.");
 }
 
 /**
@@ -700,12 +693,6 @@ export function initPlayer(videoId, initialChapters = []) {
     return;
   }
 
-  console.log("Player Module: Initializing player...");
-
-  // Ensure overlay is visible and body scroll is hidden
-  // videoPlayerOverlay.classList.remove('hidden'); // Moved inside try block
-  // document.body.classList.add('overflow-hidden'); // Moved inside try block
-
   // Destroy existing player and cleanup listeners FIRST
   destroyPlayer(); // Use the dedicated destroy function
 
@@ -720,7 +707,6 @@ export function initPlayer(videoId, initialChapters = []) {
     customControls.classList.add('pointer-events-none', 'opacity-50');
   }
 
-  console.log(`Player Module: Creating new YT.Player for videoId: ${videoId}`);
   try {
     // Ensure overlay is visible and body scroll is hidden NOW
     videoPlayerOverlay.classList.remove('hidden');
@@ -755,7 +741,6 @@ export function initPlayer(videoId, initialChapters = []) {
 
   // Setup ResizeObserver
   if ('ResizeObserver' in window && !playerResizeObserver) { // Create only if it doesn't exist
-    console.log("Player Module: Setting up ResizeObserver.");
     playerResizeObserver = new ResizeObserver(entries => {
       if (!ytPlayer || typeof ytPlayer.setSize !== 'function') return; // Check player exists
       for (let entry of entries) {
@@ -773,23 +758,18 @@ export function initPlayer(videoId, initialChapters = []) {
   } else if (!('ResizeObserver' in window)) {
     console.warn('Player Module: ResizeObserver not supported.');
   }
-
-  console.log("Player Module: initPlayer execution finished.");
 }
 
 /**
  * Destroys the YouTube player instance and cleans up associated resources.
  */
 export function destroyPlayer() {
-  console.log("Player Module: Destroying player instance and cleaning up...");
-
   // Stop progress timer
   stopProgressTimer();
 
   // Disconnect ResizeObserver
   const playerContainer = getPlayerContainer(); // Get container ref before player is destroyed
   if (playerResizeObserver && playerContainer) {
-    console.log("Player Module: Disconnecting ResizeObserver.");
     playerResizeObserver.unobserve(playerContainer);
     // Don't disconnect, reuse the observer instance if possible? No, safer to disconnect.
     playerResizeObserver.disconnect();
@@ -801,7 +781,6 @@ export function destroyPlayer() {
     if (typeof ytPlayer.destroy === 'function') {
       try {
         ytPlayer.destroy();
-        console.log("Player Module: YT Player destroyed.");
       } catch (e) {
         console.error("Player Module: Error destroying YT player:", e);
       }
@@ -813,7 +792,6 @@ export function destroyPlayer() {
 
   // Remove keyboard listener
   if (keydownAttached) {
-    console.log("Player Module: Removing keydown listener.");
     document.removeEventListener('keydown', handleKeydown);
     keydownAttached = false;
   }
@@ -844,11 +822,6 @@ export function destroyPlayer() {
   if (qualityBtn) qualityBtn.textContent = 'Auto';
   const speedBtn = getPlaybackSpeedBtn();
   if (speedBtn) speedBtn.innerHTML = '<i class="fas fa-tachometer-alt"></i> 1x'; // Reset speed display
-
-
-  // We don't clear the player container HTML here, initPlayer does that.
-
-  console.log("Player Module: Cleanup finished.");
 }
 
 /**
@@ -857,13 +830,4 @@ export function destroyPlayer() {
  */
 export function getPlayerInstance() {
   return ytPlayer;
-}
-
-// Optional: Expose a way to update chapters if needed after init
-export function setChapters(chapters) {
-  videoChapters = chapters || [];
-  // If player exists, redisplay chapters
-  if (ytPlayer && ytPlayer.getPlayerState()) {
-    displayChapters(videoChapters);
-  }
 }

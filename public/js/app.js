@@ -134,9 +134,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     SponsorBlock.fetchSponsorBlockSegments(videoId);
 
     // Initialize YouTube player using the Player module
-    console.log("app.js: Calling Player.initPlayer");
     Player.initPlayer(videoId, chapters); // Pass chapters
-    console.log("app.js: Returned from Player.initPlayer");
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
@@ -146,7 +144,6 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     hideLoading();
   }
 }
-console.log("app.js: window.loadAndDisplayVideo defined", typeof window.loadAndDisplayVideo);
 
 // Event Listeners (App Level)
 if (searchButton) {
@@ -205,7 +202,6 @@ async function performSearch() {
       hideLoading();
     }
   } else {
-    console.log('Redirecting to index page for search...');
     window.location.href = `/?query=${encodeURIComponent(query)}`;
   }
 }
@@ -320,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Add IPC Listener (Remains in app.js)
   if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
-    console.log('app.js: Setting up IPC listener for video load requests.');
     window.electronAPI.onVideoLoadRequest((videoId) => {
       console.log(`app.js: IPC Listener CALLBACK triggered with videoId: ${videoId}`);
       if (videoId && typeof videoId === 'string') {
@@ -328,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           // Call the global function, passing null for the element
           window.loadAndDisplayVideo(videoId, null);
-          console.log(`app.js: Successfully called window.loadAndDisplayVideo for ID: ${videoId} via IPC`);
         } catch (error) {
           console.error(`app.js: Error calling window.loadAndDisplayVideo for ID ${videoId} via IPC:`, error);
           showError(`Failed to load video (IPC): ${error.message}`);
@@ -341,7 +335,4 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.warn('app.js: electronAPI or onVideoLoadRequest not found. IPC listener not set up.');
   }
-
-  console.log('DOM Loaded. app.js initialized.');
-  console.log('Checking window.loadAndDisplayVideo on DOMContentLoaded:', typeof window.loadAndDisplayVideo);
 });

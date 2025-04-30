@@ -36,13 +36,13 @@ export async function fetchSponsorBlockSegments(videoId) {
     const apiUrl = `https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=${JSON.stringify(categories)}`;
     const response = await fetch(apiUrl);
     if (!response.ok) {
-      console.log(`SponsorBlock: No segments found or API error for ${videoId} (${response.status})`);
+      console.warn(`SponsorBlock: No segments found or API error for ${videoId} (${response.status})`);
       sponsorSegments = [];
       clearSponsorMarkers();
       return;
     }
     sponsorSegments = await response.json();
-    console.log(`SponsorBlock: ${sponsorSegments.length} segments found for ${videoId}`);
+    console.info(`SponsorBlock: ${sponsorSegments.length} segments found for ${videoId}`);
     // Attempt to display immediately if player is already available
     if (ytPlayerInstance) {
       displaySponsorSegments();
@@ -58,13 +58,13 @@ export async function fetchSponsorBlockSegments(videoId) {
 export function displaySponsorSegments() {
   const markersContainer = document.getElementById('segmentMarkers');
   if (!markersContainer || !ytPlayerInstance || typeof ytPlayerInstance.getDuration !== 'function') {
-    console.log("SponsorBlock Display: Cannot display markers, container or player not ready.");
+    console.error("SponsorBlock Display: Cannot display markers, container or player not ready.");
     return;
   }
 
   const duration = ytPlayerInstance.getDuration();
   if (!duration || duration <= 0) {
-    console.log("SponsorBlock Display: Cannot display markers, invalid duration:", duration);
+    console.error("SponsorBlock Display: Cannot display markers, invalid duration:", duration);
     return;
   }
 
@@ -88,9 +88,9 @@ export function displaySponsorSegments() {
 
       markersContainer.appendChild(marker);
     });
-    console.log(`SponsorBlock Display: Added ${sponsorSegments.length} segment markers.`);
+    console.info(`SponsorBlock Display: Added ${sponsorSegments.length} segment markers.`);
   } else {
-    console.log("SponsorBlock Display: No segments to display.");
+    console.info("SponsorBlock Display: No segments to display.");
   }
 }
 
@@ -116,7 +116,7 @@ export function checkAndSkipSponsorSegment(currentTime, duration) {
       const endTime = segment.segment[1];
       // Check if current time is within a sponsor segment (add a small buffer to prevent loops)
       if (currentTime >= startTime && currentTime < endTime - 0.1) {
-        console.log(`SponsorBlock: Skipping segment from ${formatTime(startTime)} to ${formatTime(endTime)}`);
+        console.info(`SponsorBlock: Skipping segment from ${formatTime(startTime)} to ${formatTime(endTime)}`);
         ytPlayerInstance.seekTo(endTime, true);
         return true; // Indicate that a skip happened
       }
