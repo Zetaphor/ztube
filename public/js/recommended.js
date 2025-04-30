@@ -79,7 +79,6 @@ function createRecommendedVideoCard(video) {
         window.handleAddToPlaylistClick(card.dataset);
       } else {
         console.error("handleAddToPlaylistClick function not found.");
-        alert("Add to playlist functionality not available yet.");
       }
     });
   }

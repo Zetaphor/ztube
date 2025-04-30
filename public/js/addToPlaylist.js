@@ -125,7 +125,6 @@ async function handlePlaylistSelection(playlistId, playlistName) {
   try {
     await addVideoToApi(playlistId, currentVideoDetails);
     console.log(`Video ${currentVideoDetails.videoId} added to playlist ${playlistId} (${playlistName})`);
-    alert(`Video "${currentVideoDetails.videoTitle || 'this video'}" added to playlist "${playlistName}".`); // Simple feedback
     closeModal();
   } catch (error) {
     console.error(`Error adding video to playlist ${playlistId}:`, error);
@@ -176,7 +175,6 @@ async function handleCreateAndAddPlaylist() {
     // 2. Add the current video to the newly created playlist
     await addVideoToApi(newPlaylist.id, currentVideoDetails);
 
-    alert(`Playlist "${newName}" created and video "${currentVideoDetails.videoTitle || 'this video'}" added.`);
     closeModal();
 
   } catch (error) {
