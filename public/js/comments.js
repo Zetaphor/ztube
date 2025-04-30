@@ -94,9 +94,9 @@ async function fetchAndDisplayComments(videoId, continuation = null) {
   const targetVideoId = continuation ? currentVideoId : videoId;
 
   try {
-    const url = continuation
-      ? `/api/comments/${targetVideoId}?continuation=${continuation}`
-      : `/api/comments/${targetVideoId}`;
+    let url = continuation
+      ? `/api/video/${targetVideoId}/comments?continuation=${continuation}`
+      : `/api/video/${targetVideoId}/comments`;
 
     // Indicate loading state on the button
     const originalButtonText = loadMoreComments.textContent;

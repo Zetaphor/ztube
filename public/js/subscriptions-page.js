@@ -164,21 +164,55 @@ function createSubscriptionVideoCard(video) {
   // Format the published date (optional, basic formatting)
   let publishedDateStr = 'Unknown date';
   try {
-    publishedDateStr = new Date(video.published).toLocaleDateString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric'
-    });
+    // Attempt to use relative time if available (like from search/channel results)
+    // Fallback to basic formatting
+    if (video.publishedText) {
+      publishedDateStr = video.publishedText; // Use pre-formatted relative string if provided
+    } else if (video.published) {
+      // Keep basic date formatting as fallback
+      publishedDateStr = new Date(video.published).toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+    }
   } catch (e) {
-    console.warn(`Could not parse date: ${video.published}`);
+    // Keep warning, but don't fail card creation
+    console.warn(`Could not parse or format date: ${video.published}`);
+    publishedDateStr = video.published || 'Invalid Date'; // Show original string if formatting failed
   }
 
-  // We don't have duration or view count from the feed
+  let publishedText = video.publishedText || 'Unknown date';
+
+  console.log('Video:', video);
+
+  // --- Add view count (matching app.js) ---
+  const views = video.viewCount || ''; // Get view count if available, default to empty string
+  // --- End add view count ---
+
+  // We don't have duration from the feed
   // Use dataset to store the unformatted date if needed later
   card.dataset.published = video.published;
-
+  // Add view count to dataset as well if needed
+  if (views) card.dataset.viewcount = views;
+  // Pass the card element itself to loadAndDisplayVideo
   card.onclick = () => window.loadAndDisplayVideo(video.id, card);
 
   // Basic channel link using channelId
   const channelLink = `/channel/${video.channelId}`;
+
+  // --- Build meta HTML string (matching app.js structure) ---
+  let metaHTML = '';
+  if (views) {
+    metaHTML += `<span>${views}</span>`; // No title attribute
+  }
+  if (views && publishedText !== 'Unknown date' && publishedText !== 'Invalid Date') {
+    metaHTML += '<span class="separator mx-1">•</span>'; // Keep separator consistent with previous edit for now, visually cleaner
+    metaHTML += `<span>${publishedText}</span>`; // No title attribute
+  } else if (publishedText !== 'Unknown date' && publishedText !== 'Invalid Date') {
+    metaHTML += `<span>${publishedText}</span>`; // No title attribute
+  }
+
+  // --- End Build meta HTML string ---
+
 
   card.innerHTML = `
         <div class="video-thumbnail relative">
@@ -195,8 +229,7 @@ function createSubscriptionVideoCard(video) {
                       <!-- No verified badge available -->
                     </a>
                     <div class="video-meta text-zinc-400 text-xs mt-0.5 flex flex-wrap gap-x-2">
-                         <span>${publishedDateStr}</span>
-                         <!-- No views available -->
+                         ${metaHTML}
                     </div>
                 </div>
             </div>
