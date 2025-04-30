@@ -7,6 +7,10 @@ let progressTimer = null;
 let videoChapters = [];
 let playerResizeObserver = null;
 let keydownAttached = false;
+let currentVideoMetadata = null; // Holds { videoId, title, channelName, channelId, durationSeconds, thumbnailUrl }
+let lastHistoryUpdateTime = 0;
+const HISTORY_UPDATE_INTERVAL_MS = 5000; // Update history every 5 seconds
+let isHistoryCheckComplete = false; // Flag to track if initial fetch/setup is done
 
 // === DOM Element Getters (Private) ===
 // These functions help avoid repeated getElementById calls and make dependencies clearer.
@@ -33,7 +37,86 @@ const getChapterToggleIcon = () => getElement('chapterToggleIcon');
 const getQualityBtn = () => getElement('qualityBtn');
 
 // === Event Handlers (Private) ===
-function onPlayerReady(event) {
+
+// -- Watch History Helpers --
+
+/** Tries to fetch watch history and seek the player */
+async function seekToWatchedTime() {
+  if (!currentVideoMetadata?.videoId || !ytPlayer || typeof ytPlayer.seekTo !== 'function') {
+    console.log('Watch History: Skipping seek, missing data or player.');
+    isHistoryCheckComplete = true; // Allow updates even if we skip the initial seek
+    return;
+  }
+
+  try {
+    console.log(`[seekToWatchedTime] ${new Date().toISOString()} - Fetching history for ${currentVideoMetadata.videoId}`);
+    const response = await fetch(`/api/watch-history/${currentVideoMetadata.videoId}`);
+    if (response.ok) {
+      const historyEntry = await response.json();
+      console.log('Watch History: Fetched entry:', JSON.stringify(historyEntry)); // Log the raw entry
+      const watchedSeconds = historyEntry?.watched_seconds;
+      console.log(`Watch History: Raw watchedSeconds value: ${watchedSeconds}, Type: ${typeof watchedSeconds}`); // Log value and type
+
+      if (watchedSeconds && typeof watchedSeconds === 'number' && watchedSeconds > 1) { // Only seek if meaningful progress exists
+        console.log(`Watch History: Resuming playback at ${formatTime(watchedSeconds)}.`);
+        ytPlayer.seekTo(watchedSeconds, true);
+        // Update progress bar immediately after seeking
+        setTimeout(updatePlaybackProgress, 50);
+      } else {
+        console.log('Watch History: No previous progress found or progress too small.');
+      }
+    } else if (response.status === 404) {
+      console.log('Watch History: No entry found for this video.');
+      // Entry doesn't exist, create it now with 0 progress
+      await updateWatchHistory(0, true); // Force initial creation
+    } else {
+      console.error(`Watch History: Failed to fetch entry (${response.status}).`);
+    }
+  } catch (error) {
+    console.error('Watch History: Error fetching entry:', error);
+  } finally {
+    // Ensure we mark the check as complete regardless of success/failure/404
+    isHistoryCheckComplete = true;
+    console.log(`[seekToWatchedTime] ${new Date().toISOString()} - History check complete.`);
+  }
+}
+
+/** Sends watch history update to the backend */
+async function updateWatchHistory(watchedSeconds, forceUpsert = false) {
+  if (!currentVideoMetadata?.videoId || typeof watchedSeconds !== 'number') {
+    // console.warn('Watch History: Skipping update, missing data.'); // Can be noisy
+    return;
+  }
+
+  const videoId = currentVideoMetadata.videoId;
+  const endpoint = forceUpsert ? '/api/watch-history/' : `/api/watch-history/${videoId}/progress`;
+  const method = forceUpsert ? 'POST' : 'PUT';
+  const body = forceUpsert ?
+    JSON.stringify({ ...currentVideoMetadata, watchedSeconds })
+    : JSON.stringify({ watchedSeconds });
+
+  const timestamp = new Date().toISOString();
+  console.log(`[updateWatchHistory] ${timestamp} - Attempting ${method} to ${endpoint} for ${videoId} with watchedSeconds: ${watchedSeconds}, forceUpsert: ${forceUpsert}`);
+  console.log(`[updateWatchHistory] ${timestamp} - Request body: ${body}`);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body
+    });
+
+    if (!response.ok) {
+      console.error(`Watch History: API Error (${response.status}) updating history for ${videoId}.`);
+    }
+  } catch (error) {
+    console.error(`Watch History: Network error updating history for ${videoId}:`, error);
+  }
+}
+
+// -- End Watch History Helpers --
+
+async function onPlayerReady(event) {
   const customControls = getCustomControls();
 
   // Re-enable controls
@@ -76,12 +159,22 @@ function onPlayerReady(event) {
   }, 1000);
 
   SponsorBlock.setPlayerInstance(event.target);
+
+  // --- Watch History --- >>
+  // Try to resume playback from history
+  await seekToWatchedTime();
+
+  // seekToWatchedTime handles creation if entry doesn't exist (on 404).
+  // No need for a separate initial update here.
+  lastHistoryUpdateTime = Date.now(); // Initialize the timer for periodic updates.
+
+  // --- Watch History --- <<
 }
 
 function onPlayerStateChange(event) {
   const playPauseBtn = getPlayPauseBtn();
   const progress = getProgress();
-  const currentTime = getCurrentTime();
+  const currentTimeEl = getCurrentTime();
 
   switch (event.data) {
     case YT.PlayerState.PLAYING:
@@ -94,14 +187,34 @@ function onPlayerStateChange(event) {
       if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
       updatePlaybackProgress();
       stopProgressTimer();
+      // --- Watch History --- >>
+      if (isHistoryCheckComplete && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+        const watchedSeconds = ytPlayer.getCurrentTime() || 0;
+        // Only update if progress is significant
+        if (watchedSeconds > 1) {
+          updateWatchHistory(watchedSeconds); // Send update on pause (use PUT)
+          lastHistoryUpdateTime = Date.now(); // Reset timer to avoid immediate update on resume
+        } else {
+          console.log(`Watch History: Skipping update on pause, progress (${formatTime(watchedSeconds)}) too small.`);
+        }
+      }
+      // --- Watch History --- <<
       break;
     case YT.PlayerState.ENDED:
       if (playPauseBtn) playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
       updatePlaybackProgress();
       stopProgressTimer();
       if (progress) progress.style.width = '0%';
-      if (currentTime) currentTime.textContent = formatTime(0);
+      if (currentTimeEl) currentTimeEl.textContent = formatTime(0);
       updateCurrentChapterUI(0, videoChapters);
+      // --- Watch History --- >>
+      if (isHistoryCheckComplete && ytPlayer && typeof ytPlayer.getDuration === 'function') {
+        // Mark as fully watched (or very close to end)
+        const finalTime = ytPlayer.getDuration() || 0;
+        updateWatchHistory(finalTime); // Send final update (use PUT)
+        lastHistoryUpdateTime = Date.now();
+      }
+      // --- Watch History --- <<
       break;
     case YT.PlayerState.BUFFERING:
       if (progressTimer === null) {
@@ -166,6 +279,14 @@ function updatePlaybackProgress() {
     progressEl.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
 
     updateCurrentChapterUI(currentVideoTime, videoChapters);
+
+    // --- Watch History Update (Throttled) --- >>
+    const now = Date.now();
+    if (isHistoryCheckComplete && now - lastHistoryUpdateTime > HISTORY_UPDATE_INTERVAL_MS) {
+      updateWatchHistory(currentVideoTime);
+      lastHistoryUpdateTime = now;
+    }
+    // --- Watch History Update --- <<
 
   } catch (error) {
     console.error('Error updating playback progress (Player Module):', error);
@@ -687,8 +808,9 @@ function setupCustomControls() {
  * Initializes the YouTube player instance.
  * @param {string} videoId - The YouTube video ID.
  * @param {Array} initialChapters - The chapters for this video.
+ * @param {object} videoMetadata - Details for watch history { title, channelName, channelId, durationSeconds, thumbnailUrl }
  */
-export function initPlayer(videoId, initialChapters = []) {
+export function initPlayer(videoId, initialChapters = [], videoMetadata = null) {
   const playerContainer = getPlayerContainer();
   // const videoPlayerOverlay = getVideoPlayerOverlay(); // No longer needed for show/hide
   const customControls = getCustomControls();
@@ -707,6 +829,8 @@ export function initPlayer(videoId, initialChapters = []) {
 
   // Store chapters
   videoChapters = initialChapters || [];
+  // Store video metadata for watch history
+  currentVideoMetadata = videoMetadata ? { ...videoMetadata, videoId } : null;
 
   // Visually disable controls until ready
   if (customControls) {
@@ -772,6 +896,20 @@ export function initPlayer(videoId, initialChapters = []) {
  * Destroys the YouTube player instance and cleans up associated resources.
  */
 export function destroyPlayer() {
+  // --- Watch History --- >>
+  // Send final update before destroying
+  if (isHistoryCheckComplete && ytPlayer && typeof ytPlayer.getCurrentTime === 'function' && currentVideoMetadata?.videoId) {
+    const lastKnownTime = ytPlayer.getCurrentTime() || 0;
+    // Only send update if progress is significant to avoid resetting on quick close/reopen
+    if (lastKnownTime > 1) {
+      updateWatchHistory(lastKnownTime);
+      console.log(`Watch History: Sent final update (${formatTime(lastKnownTime)}) on player destroy.`);
+    } else {
+      console.log(`Watch History: Skipping final update on destroy, progress (${formatTime(lastKnownTime)}) too small.`);
+    }
+  }
+  // --- Watch History --- <<
+
   // Stop progress timer
   stopProgressTimer();
 
@@ -807,6 +945,11 @@ export function destroyPlayer() {
   // Clear Chapters & Markers
   clearChapterDisplay();
   videoChapters = []; // Reset chapters state
+  currentVideoMetadata = null; // Reset metadata state
+  lastHistoryUpdateTime = 0; // Reset timer state
+
+  // Reset the flag when destroying the player
+  isHistoryCheckComplete = false;
 
   // Clear SponsorBlock state
   SponsorBlock.clearSponsorSegmentsState();

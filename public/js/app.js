@@ -89,12 +89,14 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
 
     const chapters = videoDetails.chapters || []; // Keep chapters data here
 
-    // Store details needed for the add to playlist button
+    // Store details needed for watch history and playlist button
     currentVideoDetailsForPlaylist = {
       videoId: videoId,
       videoTitle: videoDetails.title || 'Unknown',
-      channelName: videoDetails.secondary_info?.owner?.author?.name || 'Unknown',
-      thumbnailUrl: videoDetails.primary_info?.thumbnail?.url || 'img/default-video.png' // Need a thumbnail
+      channelName: videoDetails.author?.name || 'Unknown',
+      channelId: videoDetails.author?.id || null,
+      thumbnailUrl: videoDetails.thumbnails?.[0]?.url || '/img/default-video.png',
+      durationSeconds: videoDetails.durationSeconds || 0
     };
 
     // --- Update video info UI (Remains in app.js as it modifies non-player elements) ---
@@ -102,19 +104,19 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     if (videoTitle) videoTitle.textContent = videoDetails.title || 'Unknown';
 
     const channelName = document.getElementById('channelName');
-    if (channelName) channelName.textContent = videoDetails.secondary_info?.owner?.author?.name || 'Unknown';
-    if (channelName) channelName.href = videoDetails.secondary_info?.owner?.author?.id ? `/channel/${videoDetails.secondary_info?.owner?.author?.id}` : '#';
+    if (channelName) channelName.textContent = videoDetails.author?.name || 'Unknown';
+    if (channelName) channelName.href = videoDetails.author?.id ? `/channel/${videoDetails.author?.id}` : '#';
 
     const channelAvatarLink = document.getElementById('channelAvatarLink');
     const channelAvatar = document.getElementById('channelAvatar');
-    const channelIdForLink = videoDetails.secondary_info?.owner?.author?.id;
+    const channelIdForLink = videoDetails.author?.id;
 
     if (channelAvatarLink && channelIdForLink) {
       channelAvatarLink.href = `/channel/${channelIdForLink}`;
     }
 
     if (channelAvatar) {
-      channelAvatar.src = videoDetails.secondary_info?.owner?.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
+      channelAvatar.src = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
     }
 
     // Add Hover Effect Listeners (Remains in app.js)
@@ -138,7 +140,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     }
 
     const subscriberCount = document.getElementById('subscriberCount');
-    if (subscriberCount) subscriberCount.textContent = videoDetails.secondary_info?.owner?.subscriber_count?.text || '';
+    if (subscriberCount) subscriberCount.textContent = videoDetails.author?.subscriber_count?.text || '';
 
     const viewCount = document.getElementById('viewCount');
     if (viewCount) viewCount.textContent = videoDetails.view_count || '0 views';
@@ -178,13 +180,19 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     SponsorBlock.fetchSponsorBlockSegments(videoId);
 
     // Initialize YouTube player using the Player module
-    Player.initPlayer(videoId, chapters); // Pass chapters
+    Player.initPlayer(videoId, chapters, {
+      title: currentVideoDetailsForPlaylist.videoTitle,
+      channelName: currentVideoDetailsForPlaylist.channelName,
+      channelId: currentVideoDetailsForPlaylist.channelId,
+      durationSeconds: currentVideoDetailsForPlaylist.durationSeconds,
+      thumbnailUrl: currentVideoDetailsForPlaylist.thumbnailUrl
+    });
 
     // -- Setup Subscribe Button --
     if (videoPlayerSubscribeBtn) {
-      videoPlayerSubscribeBtn.dataset.channelId = videoDetails.secondary_info?.owner?.author?.id;
-      videoPlayerSubscribeBtn.dataset.channelName = videoDetails.secondary_info?.owner?.author?.name;
-      videoPlayerSubscribeBtn.dataset.channelAvatar = videoDetails.secondary_info?.owner?.author?.thumbnails?.[0]?.url || '';
+      videoPlayerSubscribeBtn.dataset.channelId = videoDetails.author?.id;
+      videoPlayerSubscribeBtn.dataset.channelName = videoDetails.author?.name;
+      videoPlayerSubscribeBtn.dataset.channelAvatar = videoDetails.author?.thumbnails?.[0]?.url || '';
       setupSubscribeButton(videoPlayerSubscribeBtn); // Call the setup function
     }
     // -- End Setup --
