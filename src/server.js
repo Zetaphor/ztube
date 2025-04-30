@@ -10,6 +10,7 @@ import * as SettingsRepo from './db/settingsRepository.js';
 import * as SubscriptionsRepo from './db/subscriptionsRepository.js';
 import * as PlaylistsRepo from './db/playlistsRepository.js';
 import * as WatchHistoryRepo from './db/watchHistoryRepository.js';
+import * as HiddenContentRepo from './db/hiddenContentRepository.js'; // Import the new repo
 
 // Load environment variables
 dotenv.config();
@@ -754,7 +755,88 @@ app.delete('/api/watch-history', async (req, res) => {
   }
 });
 
-// TODO: Remove the placeholder comment now that routes are added
+// --- Hidden Content API Routes ---
+
+// Hidden Channels
+app.get('/api/hidden/channels', async (req, res) => {
+  try {
+    const channels = await HiddenContentRepo.getAllHiddenChannels();
+    res.json(channels);
+  } catch (error) {
+    console.error('API Error GET /api/hidden/channels:', error);
+    res.status(500).json({ error: 'Failed to retrieve hidden channels' });
+  }
+});
+
+app.post('/api/hidden/channels', async (req, res) => {
+  const { channelId, name } = req.body;
+  if (!channelId || !name) {
+    return res.status(400).json({ error: 'Missing channelId or name in request body' });
+  }
+  try {
+    await HiddenContentRepo.addHiddenChannel(channelId, name);
+    res.status(201).json({ message: `Channel ${channelId} hidden successfully.` });
+  } catch (error) {
+    console.error(`API Error POST /api/hidden/channels (channelId: ${channelId}):`, error);
+    res.status(500).json({ error: `Failed to hide channel ${channelId}` });
+  }
+});
+
+app.delete('/api/hidden/channels/:channelId', async (req, res) => {
+  const { channelId } = req.params;
+  if (!channelId) {
+    return res.status(400).json({ error: 'Missing channelId in request parameters' });
+  }
+  try {
+    await HiddenContentRepo.removeHiddenChannel(channelId);
+    res.status(200).json({ message: `Channel ${channelId} unhidden successfully.` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/hidden/channels/${channelId}:`, error);
+    res.status(500).json({ error: `Failed to unhide channel ${channelId}` });
+  }
+});
+
+// Hidden Keywords
+app.get('/api/hidden/keywords', async (req, res) => {
+  try {
+    const keywords = await HiddenContentRepo.getAllHiddenKeywords();
+    // Return just the keyword strings for simplicity
+    res.json(keywords.map(k => k.keyword));
+  } catch (error) {
+    console.error('API Error GET /api/hidden/keywords:', error);
+    res.status(500).json({ error: 'Failed to retrieve hidden keywords' });
+  }
+});
+
+app.post('/api/hidden/keywords', async (req, res) => {
+  const { keyword } = req.body;
+  if (!keyword || typeof keyword !== 'string' || keyword.trim() === '') {
+    return res.status(400).json({ error: 'Missing or invalid keyword in request body' });
+  }
+  const trimmedKeyword = keyword.trim();
+  try {
+    await HiddenContentRepo.addHiddenKeyword(trimmedKeyword);
+    res.status(201).json({ message: `Keyword "${trimmedKeyword}" hidden successfully.` });
+  } catch (error) {
+    console.error(`API Error POST /api/hidden/keywords (keyword: ${trimmedKeyword}):`, error);
+    res.status(500).json({ error: `Failed to hide keyword "${trimmedKeyword}"` });
+  }
+});
+
+app.delete('/api/hidden/keywords', async (req, res) => {
+  const { keyword } = req.body; // Get keyword from body for DELETE
+  if (!keyword || typeof keyword !== 'string' || keyword.trim() === '') {
+    return res.status(400).json({ error: 'Missing or invalid keyword in request body' });
+  }
+  const trimmedKeyword = keyword.trim();
+  try {
+    await HiddenContentRepo.removeHiddenKeyword(trimmedKeyword);
+    res.status(200).json({ message: `Keyword "${trimmedKeyword}" removed successfully.` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/hidden/keywords (keyword: ${trimmedKeyword}):`, error);
+    res.status(500).json({ error: `Failed to remove hidden keyword "${trimmedKeyword}"` });
+  }
+});
 
 // Start server
 app.listen(port, () => {

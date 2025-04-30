@@ -100,6 +100,19 @@ function initializeSchema() {
             value TEXT
         );
 
+        -- Hidden Channels Table
+        CREATE TABLE IF NOT EXISTS hidden_channels (
+            channel_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            hidden_at INTEGER DEFAULT (strftime('%s', 'now'))
+        );
+
+        -- Hidden Keywords Table
+        CREATE TABLE IF NOT EXISTS hidden_keywords (
+            keyword TEXT PRIMARY KEY COLLATE NOCASE, -- Store keywords case-insensitively
+            hidden_at INTEGER DEFAULT (strftime('%s', 'now'))
+        );
+
         -- Default Settings (Example)
         INSERT OR IGNORE INTO settings (key, value) VALUES
             ('theme', 'dark'),
