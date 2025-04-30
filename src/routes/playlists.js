@@ -7,6 +7,13 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const playlists = await PlaylistsRepo.getAllPlaylists();
+    // Sort playlists: default first, then by name ascending
+    playlists.sort((a, b) => {
+      if (a.is_default && !b.is_default) return -1;
+      if (!a.is_default && b.is_default) return 1;
+      // Optionally, sort non-default playlists alphabetically
+      return a.name.localeCompare(b.name);
+    });
     res.json(playlists);
   } catch (error) {
     console.error('API Error GET /api/playlists:', error);
