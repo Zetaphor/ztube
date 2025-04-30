@@ -465,3 +465,12 @@ body {
   top: 10px;
   right: 10px;
 }
+
+#videoPlayer #videoTitle,
+#videoPlayer #videoDescription {
+  user-select: text;
+}
+
+#commentsList .comment-item {
+  user-select: text;
+}
