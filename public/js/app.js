@@ -1,30 +1,26 @@
 import { showError, showLoading, hideLoading, formatTime } from './utils.js';
 import * as SponsorBlock from './sponsorblock.js';
-import * as Player from './player.js'; // Import the new player module
-import * as Recommended from './recommended.js'; // Import the recommended module
-import * as Comments from './comments.js'; // Import the new comments module
+import * as Player from './player.js';
+import * as Recommended from './recommended.js';
+import * as Comments from './comments.js';
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
 const content = document.getElementById('content');
-const closePlayerBtn = document.getElementById('closePlayer'); // Get close button once
+const closePlayerBtn = document.getElementById('closePlayer');
 
 // Global variables / State (App Level)
 let currentVideoId = null;
-// Removed commentsNextPage
-// Removed player-specific state: ytPlayer, progressTimer, videoChapters, playerResizeObserver, keydownHandler, keydownAttached
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
-  // Removed getElementById('videoPlayer') check, Player module handles it
   console.log(`app.js: window.loadAndDisplayVideo called for ${videoId}`);
 
   try {
     showLoading();
     currentVideoId = videoId;
-    // Removed document.body.classList.add('overflow-hidden'); Player module handles it
 
     // --- Get and display date from card immediately ---
     const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
@@ -141,9 +137,6 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     console.log("app.js: Calling Player.initPlayer");
     Player.initPlayer(videoId, chapters); // Pass chapters
     console.log("app.js: Returned from Player.initPlayer");
-
-    // Setup comments listener after player is ready (Remains in app.js)
-    // setupLoadMoreCommentsListener(); // This is now handled within Comments.initComments()
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
@@ -308,24 +301,10 @@ function closeVideoPlayer() {
   // Clear app-specific state related to the video
   currentVideoId = null;
   // commentsNextPage = null; // State moved to Comments module
-
-  // Clear UI elements managed by app.js
-  // const commentsList = document.getElementById('commentsList');
-  // if (commentsList) commentsList.innerHTML = '';
-  // const loadMoreComments = document.getElementById('loadMoreComments');
-  // if (loadMoreComments) loadMoreComments.style.display = 'none';
   Comments.clearComments(); // Call the module's clear function
 
   // Clear recommended videos using the module function
   Recommended.clearRecommendedVideos();
-
-  // SponsorBlock state is cleared within Player.destroyPlayer now
-
-  // Video info fields will be overwritten when the next video loads.
-  // Optionally clear them explicitly if desired:
-  // document.getElementById('videoTitle').textContent = '';
-  // document.getElementById('channelName').textContent = '';
-  // etc.
 }
 
 document.addEventListener('DOMContentLoaded', () => {
