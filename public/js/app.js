@@ -2,6 +2,7 @@ import { showError, showLoading, hideLoading, formatTime } from './utils.js';
 import * as SponsorBlock from './sponsorblock.js';
 import * as Player from './player.js'; // Import the new player module
 import * as Recommended from './recommended.js'; // Import the recommended module
+import * as Comments from './comments.js'; // Import the new comments module
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
@@ -11,7 +12,7 @@ const closePlayerBtn = document.getElementById('closePlayer'); // Get close butt
 
 // Global variables / State (App Level)
 let currentVideoId = null;
-let commentsNextPage = null;
+// Removed commentsNextPage
 // Removed player-specific state: ytPlayer, progressTimer, videoChapters, playerResizeObserver, keydownHandler, keydownAttached
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
@@ -127,12 +128,8 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     }
     // --- End video info UI update ---
 
-    // Load comments (Remains in app.js)
-    const commentsList = document.getElementById('commentsList');
-    const loadMoreComments = document.getElementById('loadMoreComments');
-    if (commentsList && loadMoreComments) {
-      await loadComments(videoId, null, commentsList, loadMoreComments);
-    }
+    // Initialize Comments using the Module
+    Comments.initComments(videoId);
 
     // Fetch and display recommended videos (Uses Recommended module)
     Recommended.fetchRecommendedVideos(videoId);
@@ -146,7 +143,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     console.log("app.js: Returned from Player.initPlayer");
 
     // Setup comments listener after player is ready (Remains in app.js)
-    setupLoadMoreCommentsListener();
+    // setupLoadMoreCommentsListener(); // This is now handled within Comments.initComments()
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
@@ -186,8 +183,6 @@ document.addEventListener('playerInitFailed', (event) => {
 // This function needs to be global for the YouTube API callback
 window.onYouTubeIframeAPIReady = function () {
   console.log("app.js: YouTube Iframe API Ready.");
-  // The Player module will create YT.Player instances on demand
-  // So, this function doesn't need to do anything specific anymore.
 }
 
 // --- App Level Functions --- (Search, Comments, Recommendations, etc.)
@@ -305,154 +300,6 @@ async function playVideo(videoId, videoCardElement) {
   window.loadAndDisplayVideo(videoId, videoCardElement);
 }
 
-// Comments Functions
-async function loadComments(videoId, continuation = null, commentsList, loadMoreComments) {
-  if (!commentsList || !loadMoreComments) {
-    console.error("Comments list or load more button element not provided to loadComments");
-    return;
-  }
-  try {
-    const url = continuation
-      ? `/api/comments/${videoId}?continuation=${continuation}`
-      : `/api/comments/${videoId}`;
-
-    // Indicate loading state on the button
-    const originalButtonText = loadMoreComments.textContent;
-    loadMoreComments.textContent = 'Loading...';
-    loadMoreComments.disabled = true;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    loadMoreComments.textContent = originalButtonText;
-    loadMoreComments.disabled = false;
-
-    if (!response.ok) {
-      throw new Error(data.error || `Failed to fetch comments: ${response.status}`);
-    }
-
-    if (!data || !data.comments) {
-      console.warn('No comment data or empty comments received:', data);
-      // Don't clear existing comments if it was a continuation request
-      if (!continuation) {
-        commentsList.innerHTML = '<div class="text-center py-4 text-gray-500">No comments yet.</div>';
-      }
-      loadMoreComments.style.display = 'none'; // Hide button if no more comments
-      commentsNextPage = null;
-      return; // Exit function, not an error technically
-    }
-
-    if (!continuation) {
-      commentsList.innerHTML = ''; // Clear only on first load
-    }
-
-    data.comments.forEach(comment => {
-      const commentElement = createCommentElement(comment);
-      commentsList.appendChild(commentElement);
-    });
-
-    commentsNextPage = data.continuation;
-    loadMoreComments.style.display = data.continuation ? 'block' : 'none';
-
-    // Removed SponsorBlock call here, not relevant to comments
-
-  } catch (error) {
-    console.error('Failed to load comments:', error);
-    // Append error message instead of replacing content if it's a continuation
-    if (!continuation) {
-      commentsList.innerHTML = `<div class="text-center py-4 text-red-500">Failed to load comments: ${error.message}</div>`;
-    } else {
-      // Optionally show error near the button or log it
-      showError(`Failed to load more comments: ${error.message}`);
-    }
-    loadMoreComments.style.display = 'none'; // Hide button on error
-    // Restore button state on error
-    if (loadMoreComments.disabled) {
-      loadMoreComments.textContent = 'Load More Comments';
-      loadMoreComments.disabled = false;
-    }
-  }
-}
-
-function createCommentElement(comment) {
-  const div = document.createElement('div');
-  div.className = 'comment-item flex space-x-3 py-2'; // Added padding
-
-  const avatar = comment.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg'; // Default avatar
-  const authorName = comment.author?.name || 'Unknown';
-  const authorId = comment.author?.id;
-
-  // Handle rich text content safely
-  let contentHTML = '';
-  if (typeof comment.content === 'string') {
-    contentHTML = comment.content.replace(/\n/g, '<br>'); // Basic newline handling
-  } else if (Array.isArray(comment.content)) {
-    // Attempt to handle simple rich text (links)
-    contentHTML = comment.content.map(segment => {
-      if (typeof segment === 'string') {
-        return segment.replace(/\n/g, '<br>');
-      } else if (segment.url) {
-        return `<a href="${segment.url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">${segment.text.replace(/\n/g, '<br>')}</a>`;
-      } else {
-        return (segment.text || '').replace(/\n/g, '<br>');
-      }
-    }).join('');
-  } else if (typeof comment.content === 'object' && comment.content?.text) {
-    contentHTML = comment.content.text.replace(/\n/g, '<br>');
-  } else {
-    contentHTML = '';
-  }
-
-  const publishedTime = comment.published || '';
-  const likeCount = comment.like_count || '0'; // Default to '0'
-
-  // Author link or span
-  const authorLink = authorId
-    ? `<a href="/channel/${authorId}" class="font-medium text-zinc-100 hover:text-green-500 mr-2">${authorName}</a>`
-    : `<span class="font-medium text-zinc-100 mr-2">${authorName}</span>`;
-
-  div.innerHTML = `
-    <img src="${avatar}" alt="${authorName} avatar" class="w-10 h-10 rounded-full flex-shrink-0" loading="lazy">
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center mb-1 flex-wrap">
-        ${authorLink}
-        <span class="text-zinc-400 text-sm whitespace-nowrap">${publishedTime}</span>
-      </div>
-      <p class="text-zinc-200 text-sm break-words">${contentHTML}</p>
-      <div class="flex items-center mt-2 text-zinc-400 text-sm space-x-4">
-        <button class="flex items-center hover:text-zinc-300">
-          <i class="far fa-thumbs-up mr-1"></i>
-          <span>${likeCount}</span>
-        </button>
-         <button class="flex items-center hover:text-zinc-300">
-          <i class="far fa-thumbs-down mr-1"></i>
-        </button>
-        <button class="hover:text-zinc-300 text-xs font-semibold">REPLY</button>
-      </div>
-    </div>
-  `;
-
-  return div;
-}
-
-function setupLoadMoreCommentsListener() {
-  const loadMoreCommentsBtn = document.getElementById('loadMoreComments');
-  const commentsListEl = document.getElementById('commentsList');
-  if (loadMoreCommentsBtn && commentsListEl) {
-    // Remove potential old listener before adding
-    loadMoreCommentsBtn.replaceWith(loadMoreCommentsBtn.cloneNode(true));
-    // Get the new button reference
-    const newLoadMoreBtn = document.getElementById('loadMoreComments');
-    if (newLoadMoreBtn) {
-      newLoadMoreBtn.addEventListener('click', () => {
-        if (currentVideoId && commentsNextPage) {
-          loadComments(currentVideoId, commentsNextPage, commentsListEl, newLoadMoreBtn);
-        }
-      });
-    }
-  }
-}
-
 // App-level function to handle closing the player
 function closeVideoPlayer() {
   console.log("app.js: closeVideoPlayer called");
@@ -460,13 +307,14 @@ function closeVideoPlayer() {
 
   // Clear app-specific state related to the video
   currentVideoId = null;
-  commentsNextPage = null;
+  // commentsNextPage = null; // State moved to Comments module
 
   // Clear UI elements managed by app.js
-  const commentsList = document.getElementById('commentsList');
-  if (commentsList) commentsList.innerHTML = '';
-  const loadMoreComments = document.getElementById('loadMoreComments');
-  if (loadMoreComments) loadMoreComments.style.display = 'none';
+  // const commentsList = document.getElementById('commentsList');
+  // if (commentsList) commentsList.innerHTML = '';
+  // const loadMoreComments = document.getElementById('loadMoreComments');
+  // if (loadMoreComments) loadMoreComments.style.display = 'none';
+  Comments.clearComments(); // Call the module's clear function
 
   // Clear recommended videos using the module function
   Recommended.clearRecommendedVideos();
