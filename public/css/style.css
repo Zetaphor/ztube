@@ -37,6 +37,10 @@ button:focus {
   /* 16:9 Aspect Ratio */
 }
 
+.recommended-video-card .video-thumbnail {
+  padding-top: 24.25%;
+}
+
 .video-thumbnail img {
   position: absolute;
   top: 0;
@@ -317,6 +321,8 @@ button:focus {
   /* Tailwind p-2 */
   border-radius: 0.375rem;
   /* Tailwind rounded-md */
+  align-items: flex-start;
+  /* Align items to the top */
 }
 
 .recommended-video-card:hover {
@@ -352,8 +358,13 @@ button:focus {
 }
 
 .recommended-details {
-  min-width: 0;
-  /* Allow text to wrap */
+  flex-grow: 1;
+  /* Allow details section to take remaining width */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: 90px;
+  /* Match thumbnail height roughly */
 }
 
 .recommended-title {
@@ -371,6 +382,8 @@ button:focus {
   text-overflow: ellipsis;
   margin-bottom: 0.25rem;
   /* Tailwind mb-1 */
+  min-height: 2.5rem;
+  /* Roughly 2 lines */
 }
 
 .recommended-channel,
@@ -473,4 +486,111 @@ body {
 
 #commentsList .comment-item {
   user-select: text;
+}
+
+/* Add styles for thumbnail hover icons */
+.video-thumbnail {
+  position: relative;
+  /* Ensure positioning context for icons */
+}
+
+.thumbnail-icons {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: flex;
+  flex-direction: row;
+  gap: 0.375rem;
+  z-index: 10;
+  /* Ensure icons are above image/duration */
+}
+
+/* Make icons visible on card hover - Applies to individual buttons now */
+.video-card:hover .thumbnail-icons .thumbnail-icon-btn,
+.recommended-video-card:hover .thumbnail-icons .thumbnail-icon-btn {
+  opacity: 1;
+}
+
+/* Keep bookmark icon visible if it has the .visible class */
+.thumbnail-icons .bookmark-btn.visible {
+  opacity: 1;
+}
+
+.thumbnail-icon-btn {
+  background-color: rgba(39, 39, 42, 0.8);
+  /* bg-zinc-800 with opacity */
+  color: white;
+  border-radius: 9999px;
+  /* rounded-full */
+  width: 1.75rem;
+  /* w-7 */
+  height: 1.75rem;
+  /* h-7 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  /* text-xs */
+  line-height: 1rem;
+  /* Set default opacity for individual buttons */
+  opacity: 0;
+  transition: opacity 150ms ease-in-out, background-color 150ms ease-in-out;
+}
+
+/* Make ALL buttons visible on hover */
+.video-card:hover .thumbnail-icons .thumbnail-icon-btn,
+.recommended-video-card:hover .thumbnail-icons .thumbnail-icon-btn {
+  opacity: 1;
+}
+
+/* Keep bookmark visible if it has the .visible class (overrides default opacity) */
+.thumbnail-icons .bookmark-btn.visible {
+  opacity: 1;
+}
+
+.thumbnail-icon-btn:hover {
+  background-color: #16a34a;
+  /* bg-green-600 */
+}
+
+/* Ensure bookmark icon has a default color if not green */
+.thumbnail-icon-btn .fa-bookmark.far {
+  color: white;
+}
+
+/* Explicitly color the solid bookmark icon white */
+.thumbnail-icon-btn .fa-bookmark.fas {
+  color: white;
+}
+
+/* Add styles for spinner icon during bookmark toggle */
+.thumbnail-icon-btn .fa-spinner {
+  color: white;
+}
+
+/* Ensure video duration span doesn't block icon clicks */
+.video-duration,
+.recommended-duration {
+  pointer-events: none;
+}
+
+/* Style for separator in meta */
+.video-meta .separator,
+.recommended-meta .separator {
+  margin-left: 0.25rem;
+  margin-right: 0.25rem;
+}
+
+/* Style for links in meta */
+.video-meta a,
+.recommended-channel a {
+  text-decoration: none;
+  /* Optional: remove underline */
+}
+
+/* Hover effect for channel links */
+.video-meta a:hover,
+.recommended-channel a:hover {
+  color: #22c55e;
+  /* text-green-500 */
 }

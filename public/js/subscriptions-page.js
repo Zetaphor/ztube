@@ -267,7 +267,7 @@ function handleIntersection(entries, observerInstance) {
 function createSubscriptionVideoCard(video) {
   // This card generation remains the same for now
   const card = document.createElement('div');
-  card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105';
+  card.className = 'video-card group bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105 relative';
 
   // Format the published date (optional, basic formatting)
   let publishedDateStr = 'Unknown date';
@@ -324,6 +324,16 @@ function createSubscriptionVideoCard(video) {
         <div class="video-thumbnail relative">
             <img src="${video.thumbnailUrl || '/img/default-video.png'}" alt="${video.title || 'Video thumbnail'}" loading="lazy" class="w-full h-full object-cover aspect-video">
             <!-- No duration available -->
+             <!-- Thumbnail Hover Icons -->
+            <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
+                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
+                     <i class="fas fa-plus"></i>
+                 </button>
+                 <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
+                     <i class="far fa-bookmark"></i> <!-- Default state -->
+                 </button>
+            </div>
+            <!-- End Thumbnail Hover Icons -->
         </div>
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10" title="${video.title || 'Untitled'}">${video.title || 'Untitled'}</h3>
@@ -341,6 +351,66 @@ function createSubscriptionVideoCard(video) {
             </div>
         </div>
     `;
+
+  // --- Add Listeners for Hover Icons (Copied from app.js) ---
+  const bookmarkBtn = card.querySelector('.bookmark-btn');
+  const addToPlaylistBtn = card.querySelector('.add-to-playlist-hover-btn');
+  const bookmarkIcon = bookmarkBtn?.querySelector('i');
+
+  // Need videoId, videoTitle, channelName, thumbnailUrl in dataset
+  card.dataset.videoId = video.id;
+  card.dataset.videoTitle = video.title || 'Untitled';
+  card.dataset.channelName = video.channelName || 'Unknown Channel';
+  card.dataset.thumbnailUrl = video.thumbnailUrl || '/img/default-video.png';
+
+  if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
+    // Set initial icon state and visibility
+    if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) {
+      bookmarkIcon.classList.add('fas'); // Just make it solid
+      bookmarkBtn.title = "Remove from Watch Later";
+      bookmarkBtn.classList.add('visible'); // Make visible
+    } else {
+      bookmarkIcon.className = 'far fa-bookmark'; // Ensure default classes
+      bookmarkBtn.title = "Add to Watch Later";
+      bookmarkBtn.classList.remove('visible'); // Ensure hidden
+    }
+
+    bookmarkBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const currentIconClass = bookmarkIcon.className;
+      const wasVisible = bookmarkBtn.classList.contains('visible');
+      bookmarkIcon.className = 'fas fa-spinner fa-spin'; // Show loading
+      bookmarkBtn.disabled = true;
+      bookmarkBtn.classList.add('visible'); // Keep visible during load
+
+      try {
+        const isInPlaylist = await window.toggleVideoInDefaultPlaylist(card.dataset);
+        if (isInPlaylist) {
+          bookmarkIcon.className = 'fas fa-bookmark'; // Solid bookmark
+          bookmarkBtn.title = "Remove from Watch Later";
+          bookmarkBtn.classList.add('visible');
+        } else {
+          bookmarkIcon.className = 'far fa-bookmark';
+          bookmarkBtn.title = "Add to Watch Later";
+          bookmarkBtn.classList.remove('visible');
+        }
+      } catch (error) {
+        showError(`Failed to update Watch Later: ${error.message}`);
+        bookmarkIcon.className = currentIconClass; // Revert icon on error
+        if (wasVisible) bookmarkBtn.classList.add('visible'); else bookmarkBtn.classList.remove('visible'); // Revert visibility
+      } finally {
+        bookmarkBtn.disabled = false;
+      }
+    });
+  }
+
+  if (addToPlaylistBtn && window.handleAddToPlaylistClick) {
+    addToPlaylistBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.handleAddToPlaylistClick(card.dataset);
+    });
+  }
+  // --- End Hover Icon Listeners ---
 
   return card;
 }

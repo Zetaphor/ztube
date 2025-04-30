@@ -336,6 +336,16 @@ function createVideoCard(video) {
         <div class="video-thumbnail relative">
             <img src="${thumbnail}" alt="${videoTitle} thumbnail" loading="lazy" class="w-full h-full object-cover aspect-video">
             ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''}
+            <!-- Thumbnail Hover Icons -->
+            <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
+                <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
+                    <i class="far fa-bookmark"></i> <!-- Default state -->
+                </button>
+            </div>
+            <!-- End Thumbnail Hover Icons -->
         </div>
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${videoTitle}</h3>
@@ -347,28 +357,76 @@ function createVideoCard(video) {
                     <div class="flex items-center text-zinc-300 text-xs">
                       ${channelLinkContent}
                     </div>
-                    <div class="video-meta text-zinc-400 text-xs mt-0.5 flex flex-wrap gap-x-2">
+                    <div class="video-meta text-zinc-400 text-xs mt-0.5 flex flex-wrap gap-x-1">
                         ${metaHTML}
                     </div>
                 </div>
             </div>
         </div>
-        <!-- Add to Playlist Button (Hidden by default, shown on group-hover) -->
-        <button class="add-to-playlist-btn absolute top-1 right-1 bg-zinc-800/80 hover:bg-green-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10" title="Add to Playlist">
+        <!-- Original Add to Playlist Button (Now hidden, functionality moved to hover icon) -->
+        <button class="add-to-playlist-btn hidden absolute top-1 right-1 bg-zinc-800/80 hover:bg-green-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10" title="Add to Playlist">
             <i class="fas fa-plus"></i>
         </button>
     `;
 
-  const addToPlaylistBtn = card.querySelector('.add-to-playlist-btn');
-  if (addToPlaylistBtn) {
-    addToPlaylistBtn.addEventListener('click', (e) => {
+  // --- Add Listeners for Hover Icons ---
+  const bookmarkBtn = card.querySelector('.bookmark-btn');
+  const addToPlaylistBtn = card.querySelector('.add-to-playlist-hover-btn');
+  const bookmarkIcon = bookmarkBtn?.querySelector('i');
+
+  if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
+    // Set initial icon state and visibility
+    if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) {
+      bookmarkIcon.classList.add('fas'); // Just make it solid
+      bookmarkBtn.title = "Remove from Watch Later";
+      bookmarkBtn.classList.add('visible'); // Make visible
+    } else {
+      bookmarkIcon.className = 'far fa-bookmark'; // Ensure default classes
+      bookmarkBtn.title = "Add to Watch Later";
+      bookmarkBtn.classList.remove('visible'); // Ensure hidden
+    }
+
+    bookmarkBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (window.handleAddToPlaylistClick) {
-        window.handleAddToPlaylistClick(card.dataset);
-      } else {
-        console.error("handleAddToPlaylistClick function not found.");
+      const currentIconClass = bookmarkIcon.className;
+      const wasVisible = bookmarkBtn.classList.contains('visible');
+      bookmarkIcon.className = 'fas fa-spinner fa-spin'; // Show loading
+      bookmarkBtn.disabled = true;
+      bookmarkBtn.classList.add('visible'); // Keep visible during load
+
+      try {
+        const isInPlaylist = await window.toggleVideoInDefaultPlaylist(card.dataset);
+        if (isInPlaylist) {
+          bookmarkIcon.className = 'fas fa-bookmark'; // Solid bookmark
+          bookmarkBtn.title = "Remove from Watch Later";
+          bookmarkBtn.classList.add('visible');
+        } else {
+          bookmarkIcon.className = 'far fa-bookmark';
+          bookmarkBtn.title = "Add to Watch Later";
+          bookmarkBtn.classList.remove('visible');
+        }
+      } catch (error) {
+        showError(`Failed to update Watch Later: ${error.message}`);
+        bookmarkIcon.className = currentIconClass; // Revert icon on error
+        if (wasVisible) bookmarkBtn.classList.add('visible'); else bookmarkBtn.classList.remove('visible'); // Revert visibility
+      } finally {
+        bookmarkBtn.disabled = false;
       }
     });
+  }
+
+  if (addToPlaylistBtn && window.handleAddToPlaylistClick) {
+    addToPlaylistBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.handleAddToPlaylistClick(card.dataset);
+    });
+  }
+  // --- End Hover Icon Listeners ---
+
+  // Remove listener from the old hidden button if it exists
+  const oldAddToPlaylistBtn = card.querySelector('.add-to-playlist-btn');
+  if (oldAddToPlaylistBtn) {
+    oldAddToPlaylistBtn.replaceWith(oldAddToPlaylistBtn.cloneNode(true)); // Simple way to remove listeners
   }
 
   return card;
