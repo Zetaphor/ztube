@@ -38,14 +38,16 @@ function displayPlaylists(playlists) {
     const card = document.createElement('div');
     card.className = 'bg-zinc-800 rounded-lg shadow p-4 flex flex-col justify-between';
     card.dataset.playlistId = playlist.id;
+    card.dataset.isDefault = playlist.is_default; // Store default status
 
     const nameInputId = `name-input-${playlist.id}`;
     const descInputId = `desc-input-${playlist.id}`;
 
     card.innerHTML = `
             <div>
-                <h3 class="font-semibold text-lg mb-1 text-zinc-100 overflow-hidden text-ellipsis whitespace-nowrap" title="${playlist.name}">
-                   <a href="/playlists/${playlist.id}" class="hover:text-green-400">${playlist.name}</a>
+                <h3 class="font-semibold text-lg mb-1 text-zinc-100 overflow-hidden text-ellipsis whitespace-nowrap flex items-center" title="${playlist.name}">
+                   <a href="/playlists/${playlist.id}" class="hover:text-green-400 mr-2">${playlist.name}</a>
+                   <span class="default-indicator text-xs text-yellow-400 ml-auto"></span>
                 </h3>
                 <p class="text-sm text-zinc-400 mb-3 overflow-hidden text-ellipsis whitespace-nowrap" title="${playlist.description || ''}">${playlist.description || 'No description'}</p>
 
@@ -56,6 +58,9 @@ function displayPlaylists(playlists) {
                 </div>
             </div>
             <div class="flex justify-end space-x-2 mt-3 pt-3 border-t border-zinc-700">
+                <button class="set-default-btn text-zinc-400 hover:text-yellow-500 text-sm hidden" title="Set as Default Playlist">
+                    <i class="fas fa-star"></i>
+                </button>
                 <button class="edit-btn text-zinc-400 hover:text-green-500 text-sm" title="Edit Playlist">
                     <i class="fas fa-pencil-alt"></i>
                 </button>
@@ -80,6 +85,21 @@ function displayPlaylists(playlists) {
     const editForm = card.querySelector('.edit-form');
     const nameDisplay = card.querySelector('h3 a');
     const descDisplay = card.querySelector('p');
+    const defaultIndicator = card.querySelector('.default-indicator');
+    const setDefaultBtn = card.querySelector('.set-default-btn');
+
+    // --- Default Playlist Logic ---
+    if (playlist.is_default) {
+      defaultIndicator.innerHTML = '<i class="fas fa-star mr-1" title="Default Playlist"></i> Default';
+      deleteBtn.classList.add('hidden'); // Hide delete for default
+      editBtn.classList.add('mr-auto'); // Push edit button to the left if delete is hidden
+    } else {
+      setDefaultBtn.classList.remove('hidden'); // Show set default button
+      setDefaultBtn.addEventListener('click', async () => {
+        await setDefaultPlaylist(playlist.id);
+      });
+    }
+    // --- End Default Playlist Logic ---
 
     editBtn.addEventListener('click', () => {
       editForm.classList.remove('hidden');
@@ -114,11 +134,14 @@ function displayPlaylists(playlists) {
       await updatePlaylist(playlist.id, newName, newDescription);
     });
 
-    deleteBtn.addEventListener('click', async () => {
-      if (confirm(`Are you sure you want to delete the playlist "${playlist.name}"? This cannot be undone.`)) {
-        await deletePlaylist(playlist.id);
-      }
-    });
+    // Only add delete listener if it's not the default playlist (button is visible)
+    if (!playlist.is_default) {
+      deleteBtn.addEventListener('click', async () => {
+        if (confirm(`Are you sure you want to delete the playlist "${playlist.name}"? This cannot be undone.`)) {
+          await deletePlaylist(playlist.id);
+        }
+      });
+    }
   });
 }
 
@@ -209,6 +232,28 @@ async function updatePlaylist(playlistId, name, description) {
     showError(`Error updating playlist: ${error.message}`, errorDisplay);
     // Optionally revert UI changes or keep edit mode open on failure?
     // For simplicity, we reload, which exits edit mode.
+  } finally {
+    hideLoading();
+  }
+}
+
+// Function to set a playlist as default
+async function setDefaultPlaylist(playlistId) {
+  showLoading();
+  errorDisplay.classList.add('hidden');
+  try {
+    const response = await fetch(`/api/playlists/${playlistId}/default`, {
+      method: 'PUT',
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to set default playlist: ${response.status}`);
+    }
+    console.log(`Playlist ${playlistId} set as default`);
+    await loadPlaylists(); // Reload list to show changes
+  } catch (error) {
+    console.error(`Error setting playlist ${playlistId} as default:`, error);
+    showError(`Error setting default playlist: ${error.message}`, errorDisplay);
   } finally {
     hideLoading();
   }

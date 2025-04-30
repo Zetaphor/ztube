@@ -28,7 +28,7 @@ export const createPlaylist = (name, description = '') => {
  */
 export const getAllPlaylists = () => {
   return new Promise((resolve, reject) => {
-    db.all('SELECT id, name, description, created_at FROM playlists ORDER BY name COLLATE NOCASE ASC', [], (err, rows) => {
+    db.all('SELECT id, name, description, created_at, is_default FROM playlists ORDER BY is_default ASC, name COLLATE NOCASE ASC', [], (err, rows) => {
       if (err) {
         console.error('Error getting playlists:', err.message);
         return reject(err);
@@ -102,14 +102,79 @@ export const updatePlaylistDetails = (playlistId, name, description) => {
  */
 export const deletePlaylist = (playlistId) => {
   return new Promise((resolve, reject) => {
-    // Foreign key constraint ON DELETE CASCADE handles deleting playlist_videos entries
-    db.run('DELETE FROM playlists WHERE id = ?', [playlistId], function (err) {
+    // First, check if the playlist is the default one
+    db.get('SELECT is_default FROM playlists WHERE id = ?', [playlistId], (err, row) => {
       if (err) {
-        console.error(`Error deleting playlist ID ${playlistId}:`, err.message);
+        console.error(`Error checking default status for playlist ID ${playlistId}:`, err.message);
         return reject(err);
       }
-      console.log(`Playlist deleted ID ${playlistId}. Changes: ${this.changes}`);
-      resolve();
+      if (!row) {
+        // Playlist doesn't exist, maybe resolve successfully or reject?
+        // Rejecting for consistency, as the delete would fail anyway.
+        return reject(new Error(`Playlist with ID ${playlistId} not found.`));
+      }
+      if (row.is_default === 1) {
+        return reject(new Error('Cannot delete the default playlist.'));
+      }
+
+      // If not default, proceed with deletion
+      // Foreign key constraint ON DELETE CASCADE handles deleting playlist_videos entries
+      db.run('DELETE FROM playlists WHERE id = ?', [playlistId], function (err) {
+        if (err) {
+          console.error(`Error deleting playlist ID ${playlistId}:`, err.message);
+          return reject(err);
+        }
+        console.log(`Playlist deleted ID ${playlistId}. Changes: ${this.changes}`);
+        resolve();
+      });
+    });
+  });
+};
+
+/**
+ * Sets a specific playlist as the default.
+ * Ensures only one playlist is marked as default.
+ * @param {number} playlistId The ID of the playlist to set as default.
+ * @returns {Promise<void>}
+ */
+export const setDefaultPlaylist = (playlistId) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION', (beginErr) => {
+        if (beginErr) return reject(beginErr);
+
+        // Step 1: Unset the current default playlist
+        db.run('UPDATE playlists SET is_default = 0 WHERE is_default = 1', [], function (unsetErr) {
+          if (unsetErr) {
+            console.error('Error unsetting current default playlist:', unsetErr.message);
+            return db.run('ROLLBACK', () => reject(unsetErr));
+          }
+          // console.log(`Unset previous default playlist. Changes: ${this.changes}`);
+
+          // Step 2: Set the new default playlist
+          db.run('UPDATE playlists SET is_default = 1 WHERE id = ?', [playlistId], function (setErr) {
+            if (setErr) {
+              console.error(`Error setting playlist ID ${playlistId} as default:`, setErr.message);
+              return db.run('ROLLBACK', () => reject(setErr));
+            }
+            if (this.changes === 0) {
+              // This means the playlist ID didn't exist
+              console.warn(`Attempted to set non-existent playlist ID ${playlistId} as default.`);
+              return db.run('ROLLBACK', () => reject(new Error(`Playlist with ID ${playlistId} not found.`)));
+            }
+            console.log(`Playlist ID ${playlistId} set as default. Changes: ${this.changes}`);
+
+            // Step 3: Commit the transaction
+            db.run('COMMIT', (commitErr) => {
+              if (commitErr) {
+                console.error('Error committing transaction for setting default playlist:', commitErr.message);
+                return reject(commitErr);
+              }
+              resolve();
+            });
+          });
+        });
+      });
     });
   });
 };

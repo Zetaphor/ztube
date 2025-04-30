@@ -74,6 +74,25 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Set a playlist as default
+router.put('/:id/default', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  try {
+    await PlaylistsRepo.setDefaultPlaylist(playlistId);
+    res.status(200).json({ message: `Playlist ${playlistId} set as default.` });
+  } catch (error) {
+    console.error(`API Error PUT /api/playlists/${playlistId}/default:`, error);
+    if (error.message?.includes('not found')) {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: `Failed to set playlist ${playlistId} as default: ${error.message}` });
+    }
+  }
+});
+
 // Delete a playlist
 router.delete('/:id', async (req, res) => {
   const playlistId = parseInt(req.params.id, 10);
