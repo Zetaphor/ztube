@@ -89,16 +89,25 @@
             <div>
               <a id="channelName" href="#" class="font-medium text-lg text-zinc-200 hover:text-green-500 block"></a>
               <p id="subscriberCount" class="text-zinc-400 text-sm mb-2"></p>
-              <button id="videoPlayerSubscribeBtn"
-                class="px-3 py-1 rounded bg-zinc-600 hover:bg-zinc-500 text-white font-medium text-xs transition-colors mr-2"
-                data-channel-id="" data-channel-name="" data-channel-avatar="">
-                Subscribe
-              </button>
-              <button id="addToPlaylistBtnPlayer"
-                class="px-3 py-1 rounded bg-zinc-600 hover:bg-zinc-500 text-white font-medium text-xs transition-colors"
-                title="Add to Playlist">
-                <i class="fas fa-plus"></i> Add to Playlist
-              </button>
+              <!-- Action Buttons -->
+              <div class="flex items-center space-x-2 mt-2">
+                <button id="videoPlayerSubscribeBtn"
+                  class="px-3 py-1 rounded bg-zinc-600 hover:bg-zinc-500 text-white font-medium text-xs transition-colors"
+                  data-channel-id="" data-channel-name="" data-channel-avatar="">
+                  Subscribe
+                </button>
+                <button id="addToPlaylistBtnPlayer"
+                  class="video-action-icon-btn bg-zinc-600 hover:bg-zinc-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs transition-colors"
+                  title="Add to Playlist">
+                  <i class="fas fa-plus"></i>
+                </button>
+                <button id="videoPlayerToggleWatchLaterBtn"
+                  class="video-action-icon-btn bg-zinc-600 hover:bg-zinc-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs transition-colors"
+                  title="Add to Watch Later">
+                  <i class="far fa-bookmark"></i> <!-- Default state -->
+                </button>
+              </div>
+              <!-- End Action Buttons -->
             </div>
           </div>
           <div class="text-right flex-shrink-0 ml-4">

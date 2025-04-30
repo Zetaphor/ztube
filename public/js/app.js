@@ -12,6 +12,7 @@ const content = document.getElementById('content');
 const closePlayerBtn = document.getElementById('closePlayer');
 const videoPlayerSubscribeBtn = document.getElementById('videoPlayerSubscribeBtn');
 const videoPlayerAddToPlaylistBtn = document.getElementById('addToPlaylistBtnPlayer'); // Get the new button
+const videoPlayerToggleWatchLaterBtn = document.getElementById('videoPlayerToggleWatchLaterBtn');
 
 // Global variables / State (App Level)
 let currentVideoId = null;
@@ -161,6 +162,62 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
       setupSubscribeButton(videoPlayerSubscribeBtn); // Call the setup function
     }
     // -- End Setup --
+
+    // -- Setup Toggle Watch Later Button --
+    if (videoPlayerToggleWatchLaterBtn && window.toggleVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist) {
+      // Set initial state directly on the button before cloning
+      const initiallyInDefault = window.isVideoInDefaultPlaylist(videoId);
+      const initialIcon = videoPlayerToggleWatchLaterBtn.querySelector('i');
+      if (initialIcon) {
+        if (initiallyInDefault) {
+          initialIcon.className = 'fas fa-bookmark';
+          videoPlayerToggleWatchLaterBtn.title = "Remove from Watch Later";
+        } else {
+          initialIcon.className = 'far fa-bookmark';
+          videoPlayerToggleWatchLaterBtn.title = "Add to Watch Later";
+        }
+      }
+
+      // Remove previous listener if any, then add new one
+      const newWatchLaterButton = videoPlayerToggleWatchLaterBtn.cloneNode(true);
+      videoPlayerToggleWatchLaterBtn.parentNode.replaceChild(newWatchLaterButton, videoPlayerToggleWatchLaterBtn);
+
+      newWatchLaterButton.addEventListener('click', async () => {
+        const iconElement = newWatchLaterButton.querySelector('i');
+        if (!iconElement) return; // Safety check
+
+        const currentIconClass = iconElement.className;
+        iconElement.className = 'fas fa-spinner fa-spin';
+        newWatchLaterButton.disabled = true;
+
+        try {
+          // Ensure we have the necessary details
+          if (!currentVideoDetailsForPlaylist || !currentVideoDetailsForPlaylist.videoId) {
+            throw new Error("Video details not available for Watch Later toggle.");
+          }
+          const isNowInPlaylist = await window.toggleVideoInDefaultPlaylist(currentVideoDetailsForPlaylist);
+          // Update the button directly after success
+          if (isNowInPlaylist) {
+            iconElement.className = 'fas fa-bookmark';
+            newWatchLaterButton.title = "Remove from Watch Later";
+          } else {
+            iconElement.className = 'far fa-bookmark';
+            newWatchLaterButton.title = "Add to Watch Later";
+          }
+          newWatchLaterButton.disabled = false; // Re-enable on success
+        } catch (error) {
+          console.error("Error toggling Watch Later from player:", error);
+          showError(`Failed to update Watch Later: ${error.message}`);
+          iconElement.className = currentIconClass; // Revert icon on error
+          newWatchLaterButton.disabled = false; // Re-enable button on error
+        }
+      });
+    } else if (videoPlayerToggleWatchLaterBtn) {
+      // Hide or disable button if functionality isn't available
+      videoPlayerToggleWatchLaterBtn.style.display = 'none';
+      console.warn('Watch Later button found, but toggle functions are missing.')
+    }
+    // -- End Setup Watch Later Button --
 
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
