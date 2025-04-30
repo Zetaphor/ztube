@@ -14,6 +14,14 @@ const allTabContents = document.querySelectorAll('.tab-content');
 const refreshFeedButton = document.getElementById('refreshFeedButton');
 const CACHE_KEY = 'subscriptionsFeedCache';
 
+// --- Lazy Loading Variables ---
+const VIDEOS_PER_PAGE = 25; // Number of videos to load per batch
+let allFetchedVideos = []; // Store all videos fetched from API or cache
+let currentVideoIndex = 0; // Index of the next video to display
+let observer = null; // Intersection Observer instance
+const sentinelId = 'video-lazy-load-sentinel';
+// --- End Lazy Loading Variables ---
+
 document.addEventListener('DOMContentLoaded', () => {
   // Add Tab Listeners
   videosTab?.addEventListener('click', () => switchTab('videos'));
@@ -28,7 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const videos = JSON.parse(cachedData);
       console.info(`Loaded ${videos.length} videos from cache.`);
       // Display initially in the videos tab
-      displaySubscriptionVideos(videos);
+      allFetchedVideos = videos; // Store cached videos
+      currentVideoIndex = 0; // Reset index
+      displaySubscriptionVideos(); // Start display process (which now includes lazy loading)
       shouldFetch = false; // Don't fetch immediately if cache is loaded
     } catch (e) {
       console.error('Failed to parse cached subscription data:', e);
@@ -87,7 +97,7 @@ async function loadSubscriptionFeed(forceFetch = false) {
   }
 
   try {
-    const response = await fetch('/api/subscriptions/feed');
+    const response = await fetch('/subscriptions/api/feed');
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || `Failed to fetch subscription feed: ${response.status}`);
@@ -104,7 +114,9 @@ async function loadSubscriptionFeed(forceFetch = false) {
     }
 
     // Display the newly fetched data (in the Videos tab for now)
-    displaySubscriptionVideos(videos);
+    allFetchedVideos = videos; // Store fetched videos
+    currentVideoIndex = 0; // Reset index
+    displaySubscriptionVideos(); // Start display process
 
   } catch (error) {
     console.error('Failed to load subscription feed:', error);
@@ -119,42 +131,107 @@ async function loadSubscriptionFeed(forceFetch = false) {
   }
 }
 
-function displaySubscriptionVideos(videos) {
-  // This function now specifically targets the videosContent container
+// --- Updated to handle lazy loading ---
+function displaySubscriptionVideos() {
   if (!videosContent) return;
 
-  videosContent.innerHTML = ''; // Clear previous content (whether loading message or old cache)
-
-  // TODO: Filter `videos` array here to separate actual videos and shorts once a reliable method is found.
-  // For now, display all items as videos.
-  const actualVideos = videos; // Placeholder: Assume all are videos
-  // const shorts = videos.filter(v => isShort(v)); // Future filtering logic
-
-  if (!actualVideos || actualVideos.length === 0) {
-    videosContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No videos found in your subscription feeds. Try adding some subscriptions or refreshing!</p>';
-    // We could potentially display shorts even if no videos found, if filtering worked
-  } else {
-    actualVideos.forEach(video => {
-      const card = createSubscriptionVideoCard(video); // Use the same card for now
-      videosContent.appendChild(card);
-    });
+  // Clear previous content ONLY on the first call or refresh
+  if (currentVideoIndex === 0) {
+    videosContent.innerHTML = '';
+    // Ensure sentinel doesn't exist from previous state
+    const existingSentinel = document.getElementById(sentinelId);
+    existingSentinel?.remove();
   }
 
-  // --- Placeholder for Shorts Display ---
+  // TODO: Filter `allFetchedVideos` array here to separate actual videos and shorts once implemented.
+  const actualVideos = allFetchedVideos; // Placeholder: Assume all are videos for now
+
+  if (!actualVideos || actualVideos.length === 0) {
+    if (currentVideoIndex === 0) { // Only show if it's the initial load and empty
+      videosContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No videos found in your subscription feeds. Try adding some subscriptions or refreshing!</p>';
+    }
+    return; // No videos to display or load further
+  }
+
+  const nextBatch = actualVideos.slice(currentVideoIndex, currentVideoIndex + VIDEOS_PER_PAGE);
+
+  if (nextBatch.length === 0 && currentVideoIndex === 0) {
+    // Handle case where fetch/cache returns empty array initially
+    videosContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No videos found.</p>';
+    return;
+  }
+
+  nextBatch.forEach(video => {
+    const card = createSubscriptionVideoCard(video);
+    videosContent.appendChild(card);
+  });
+
+  currentVideoIndex += nextBatch.length;
+
+  // --- Set up or update sentinel for Intersection Observer ---
+  setupIntersectionObserver(actualVideos.length);
+  // --- End Sentinel Setup ---
+
+  // --- Placeholder for Shorts Display (Remains unchanged for now) ---
   if (shortsContent) {
     const actualShorts = []; // Placeholder: No shorts identified yet
     if (!actualShorts || actualShorts.length === 0) {
-      shortsContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No shorts found yet, or filtering is not implemented.</p>';
+      // Only set initial message if shorts tab is active and empty
+      if (!shortsContent.classList.contains('hidden')) {
+        shortsContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No shorts found yet, or filtering is not implemented.</p>';
+      }
     } else {
-      shortsContent.innerHTML = ''; // Clear placeholder
-      // actualShorts.forEach(short => {
-      //     const shortCard = createSubscriptionShortCard(short); // Need a different card style for shorts
-      //     shortsContent.appendChild(shortCard);
-      // });
+      // Logic to display shorts if/when available
+      // shortsContent.innerHTML = ''; // Clear placeholder if displaying
+      // actualShorts.forEach(short => { ... });
     }
   }
   // --- End Placeholder ---
 }
+// --- End Updated Function ---
+
+// --- New function to set up Intersection Observer ---
+function setupIntersectionObserver(totalVideos) {
+  // Disconnect previous observer if exists
+  if (observer) {
+    observer.disconnect();
+  }
+
+  // Remove old sentinel if exists
+  const oldSentinel = document.getElementById(sentinelId);
+  oldSentinel?.remove();
+
+  // Only add sentinel and observe if there are more videos to load
+  if (currentVideoIndex < totalVideos) {
+    const sentinel = document.createElement('div');
+    sentinel.id = sentinelId;
+    // Add some minimal styling or height if needed for reliable intersection
+    sentinel.className = "col-span-full h-10"; // Span across grid, give some height
+    videosContent.appendChild(sentinel);
+
+    const options = {
+      root: null, // Use the viewport as the root
+      rootMargin: '0px',
+      threshold: 0.1 // Trigger when 10% of the sentinel is visible
+    };
+
+    observer = new IntersectionObserver(handleIntersection, options);
+    observer.observe(sentinel);
+  }
+}
+
+// --- New function called by Intersection Observer ---
+function handleIntersection(entries, observerInstance) {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      console.log('Sentinel intersected, loading more videos...');
+      // Stop observing the current sentinel before loading more
+      // observerInstance.unobserve(entry.target); // Moved sentinel removal to setupIntersectionObserver
+      displaySubscriptionVideos(); // Load the next batch
+    }
+  });
+}
+// --- End New Observer Functions ---
 
 function createSubscriptionVideoCard(video) {
   // This card generation remains the same for now
@@ -228,7 +305,7 @@ function createSubscriptionVideoCard(video) {
                       ${video.channelName || 'Unknown Channel'}
                       <!-- No verified badge available -->
                     </a>
-                    <div class="video-meta text-zinc-400 text-xs mt-0.5 flex flex-wrap gap-x-2">
+                    <div class="video-meta text-zinc-400 text-xs mt-0.5 flex flex-wrap gap-x-1">
                          ${metaHTML}
                     </div>
                 </div>

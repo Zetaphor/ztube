@@ -185,7 +185,6 @@ router.get('/api/:channelId/status', async (req, res) => {
 router.get('/api/feed', async (req, res) => {
   try {
     const subscriptions = await SubscriptionsRepo.getAllSubscriptions();
-    console.info(`Aggregating feed for ${subscriptions.length} subscriptions.`);
 
     if (subscriptions.length === 0) {
       return res.json([]); // Return empty if no subscriptions
