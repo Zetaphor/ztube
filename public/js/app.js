@@ -12,7 +12,6 @@ const content = document.getElementById('content');
 const closePlayerBtn = document.getElementById('closePlayer');
 const videoPlayerSubscribeBtn = document.getElementById('videoPlayerSubscribeBtn');
 const videoPlayerAddToPlaylistBtn = document.getElementById('addToPlaylistBtnPlayer'); // Get the new button
-const videoPlayerToggleWatchLaterBtn = document.getElementById('videoPlayerToggleWatchLaterBtn');
 
 // Global variables / State (App Level)
 let currentVideoId = null;
@@ -190,9 +189,12 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     }
     // -- End Setup --
 
-    // -- Setup Toggle Watch Later Button --
+    // --- Get button reference *within* the current player context ---
+    const videoPlayerToggleWatchLaterBtn = document.getElementById('videoPlayerToggleWatchLaterBtn');
+
+    // -- Setup Toggle Watch Later Button (Player specific) --
     if (videoPlayerToggleWatchLaterBtn && window.toggleVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist) {
-      // Set initial state directly on the button before cloning
+      // Set initial state based on *current* knowledge
       const initiallyInDefault = window.isVideoInDefaultPlaylist(videoId);
       const initialIcon = videoPlayerToggleWatchLaterBtn.querySelector('i');
       if (initialIcon) {
