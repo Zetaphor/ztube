@@ -1,2 +1,10 @@
 node_modules
 output.txt
+*.db
+*.db-journal
+*.db-trace
+*.db-wal
+*.db-shm
+*.db-lock
+*.db-trace
+*.db-wal

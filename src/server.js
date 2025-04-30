@@ -5,6 +5,11 @@ import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 import { Innertube } from 'youtubei.js';
 import { YTNodes } from 'youtubei.js';
+import db from './db/database.js'; // Import the database connection
+import * as SettingsRepo from './db/settingsRepository.js';
+import * as SubscriptionsRepo from './db/subscriptionsRepository.js';
+import * as PlaylistsRepo from './db/playlistsRepository.js';
+import * as WatchHistoryRepo from './db/watchHistoryRepository.js';
 
 // Load environment variables
 dotenv.config();
@@ -456,6 +461,300 @@ app.get('/api/channel/:id/videos', async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve channel videos' });
   }
 });
+
+// --- Database API Routes ---
+
+// Settings
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = await SettingsRepo.getAllSettings();
+    res.json(settings);
+  } catch (error) {
+    console.error('API Error GET /api/settings:', error);
+    res.status(500).json({ error: 'Failed to retrieve settings' });
+  }
+});
+
+app.put('/api/settings', async (req, res) => {
+  const { key, value } = req.body;
+  if (typeof key !== 'string' || typeof value === 'undefined') {
+    return res.status(400).json({ error: 'Missing or invalid key/value in request body' });
+  }
+  try {
+    await SettingsRepo.setSetting(key, String(value)); // Ensure value is stored as string
+    res.status(200).json({ message: `Setting '${key}' updated successfully.` });
+  } catch (error) {
+    console.error(`API Error PUT /api/settings (key: ${key}):`, error);
+    res.status(500).json({ error: `Failed to update setting '${key}'` });
+  }
+});
+
+// Subscriptions
+app.get('/api/subscriptions', async (req, res) => {
+  try {
+    const subs = await SubscriptionsRepo.getAllSubscriptions();
+    res.json(subs);
+  } catch (error) {
+    console.error('API Error GET /api/subscriptions:', error);
+    res.status(500).json({ error: 'Failed to retrieve subscriptions' });
+  }
+});
+
+app.post('/api/subscriptions', async (req, res) => {
+  const { channelId, name, avatarUrl } = req.body;
+  if (!channelId || !name) {
+    return res.status(400).json({ error: 'Missing channelId or name in request body' });
+  }
+  try {
+    await SubscriptionsRepo.addSubscription(channelId, name, avatarUrl);
+    res.status(201).json({ message: `Subscription added for channel ${channelId}` });
+  } catch (error) {
+    console.error(`API Error POST /api/subscriptions (channelId: ${channelId}):`, error);
+    res.status(500).json({ error: `Failed to add subscription for channel ${channelId}` });
+  }
+});
+
+app.delete('/api/subscriptions/:channelId', async (req, res) => {
+  const { channelId } = req.params;
+  if (!channelId) {
+    return res.status(400).json({ error: 'Missing channelId in request parameters' });
+  }
+  try {
+    await SubscriptionsRepo.removeSubscription(channelId);
+    res.status(200).json({ message: `Subscription removed for channel ${channelId}` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/subscriptions/${channelId}:`, error);
+    res.status(500).json({ error: `Failed to remove subscription for channel ${channelId}` });
+  }
+});
+
+app.get('/api/subscriptions/:channelId/status', async (req, res) => {
+  const { channelId } = req.params;
+  if (!channelId) {
+    return res.status(400).json({ error: 'Missing channelId in request parameters' });
+  }
+  try {
+    const isSubbed = await SubscriptionsRepo.isSubscribed(channelId);
+    res.json({ isSubscribed: isSubbed });
+  } catch (error) {
+    console.error(`API Error GET /api/subscriptions/${channelId}/status:`, error);
+    res.status(500).json({ error: `Failed to check subscription status for channel ${channelId}` });
+  }
+});
+
+
+// Playlists
+app.get('/api/playlists', async (req, res) => {
+  try {
+    const playlists = await PlaylistsRepo.getAllPlaylists();
+    res.json(playlists);
+  } catch (error) {
+    console.error('API Error GET /api/playlists:', error);
+    res.status(500).json({ error: 'Failed to retrieve playlists' });
+  }
+});
+
+app.post('/api/playlists', async (req, res) => {
+  const { name, description } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: 'Missing playlist name in request body' });
+  }
+  try {
+    const newPlaylistId = await PlaylistsRepo.createPlaylist(name, description);
+    res.status(201).json({ id: newPlaylistId, name: name, description: description || '' });
+  } catch (error) {
+    console.error(`API Error POST /api/playlists (name: ${name}):`, error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({ error: `Playlist with name "${name}" already exists.` });
+    } else {
+      res.status(500).json({ error: `Failed to create playlist "${name}"` });
+    }
+  }
+});
+
+app.get('/api/playlists/:id', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  try {
+    const playlist = await PlaylistsRepo.getPlaylistById(playlistId);
+    if (!playlist) {
+      return res.status(404).json({ error: `Playlist with ID ${playlistId} not found` });
+    }
+    res.json(playlist);
+  } catch (error) {
+    console.error(`API Error GET /api/playlists/${playlistId}:`, error);
+    res.status(500).json({ error: `Failed to retrieve playlist ${playlistId}` });
+  }
+});
+
+app.put('/api/playlists/:id', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  const { name, description } = req.body;
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  if (!name) { // Description can be empty/null
+    return res.status(400).json({ error: 'Missing playlist name in request body' });
+  }
+  try {
+    // Optional: Check if playlist exists first? Repo function handles non-existence.
+    await PlaylistsRepo.updatePlaylistDetails(playlistId, name, description || '');
+    res.status(200).json({ message: `Playlist ${playlistId} updated successfully.` });
+  } catch (error) {
+    console.error(`API Error PUT /api/playlists/${playlistId}:`, error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({ error: `Playlist with name "${name}" already exists.` });
+    } else {
+      res.status(500).json({ error: `Failed to update playlist ${playlistId}` });
+    }
+  }
+});
+
+app.delete('/api/playlists/:id', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  try {
+    await PlaylistsRepo.deletePlaylist(playlistId);
+    res.status(200).json({ message: `Playlist ${playlistId} deleted successfully.` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/playlists/${playlistId}:`, error);
+    res.status(500).json({ error: `Failed to delete playlist ${playlistId}` });
+  }
+});
+
+// Playlist Videos
+app.post('/api/playlists/:id/videos', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  const { videoId, title, channelName, thumbnailUrl } = req.body;
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  if (!videoId) {
+    return res.status(400).json({ error: 'Missing videoId in request body' });
+  }
+  try {
+    // Optional: Check if playlist exists first
+    await PlaylistsRepo.addVideoToPlaylist(playlistId, videoId, title, channelName, thumbnailUrl);
+    res.status(201).json({ message: `Video ${videoId} added to playlist ${playlistId}` });
+  } catch (error) {
+    console.error(`API Error POST /api/playlists/${playlistId}/videos:`, error);
+    // Could check for foreign key constraint error if playlist doesn't exist
+    res.status(500).json({ error: `Failed to add video ${videoId} to playlist ${playlistId}` });
+  }
+});
+
+app.delete('/api/playlists/:id/videos/:videoId', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  const { videoId } = req.params;
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  if (!videoId) {
+    return res.status(400).json({ error: 'Missing videoId in request parameters' });
+  }
+  try {
+    await PlaylistsRepo.removeVideoFromPlaylist(playlistId, videoId);
+    res.status(200).json({ message: `Video ${videoId} removed from playlist ${playlistId}` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/playlists/${playlistId}/videos/${videoId}:`, error);
+    res.status(500).json({ error: `Failed to remove video ${videoId} from playlist ${playlistId}` });
+  }
+});
+
+app.put('/api/playlists/:id/videos/order', async (req, res) => {
+  const playlistId = parseInt(req.params.id, 10);
+  const { videoOrder } = req.body;
+  if (isNaN(playlistId)) {
+    return res.status(400).json({ error: 'Invalid playlist ID' });
+  }
+  if (!Array.isArray(videoOrder) || videoOrder.some(item => !item.videoId || typeof item.sortOrder !== 'number')) {
+    return res.status(400).json({ error: 'Invalid videoOrder array in request body. Expected [{videoId: string, sortOrder: number}]' });
+  }
+  try {
+    await PlaylistsRepo.updatePlaylistVideoOrder(playlistId, videoOrder);
+    res.status(200).json({ message: `Video order updated for playlist ${playlistId}` });
+  } catch (error) {
+    console.error(`API Error PUT /api/playlists/${playlistId}/videos/order:`, error);
+    res.status(500).json({ error: `Failed to update video order for playlist ${playlistId}` });
+  }
+});
+
+
+// Watch History
+app.get('/api/watch-history', async (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 50;
+  const offset = parseInt(req.query.offset, 10) || 0;
+  try {
+    const history = await WatchHistoryRepo.getWatchHistory(limit, offset);
+    res.json(history);
+  } catch (error) {
+    console.error('API Error GET /api/watch-history:', error);
+    res.status(500).json({ error: 'Failed to retrieve watch history' });
+  }
+});
+
+app.post('/api/watch-history', async (req, res) => {
+  const { videoId, title, channelName, channelId, durationSeconds, watchedSeconds, thumbnailUrl } = req.body;
+  // Basic validation
+  if (!videoId || !title || !channelName || !channelId || typeof durationSeconds !== 'number' || typeof watchedSeconds !== 'number') {
+    return res.status(400).json({ error: 'Missing or invalid fields in request body for watch history entry' });
+  }
+  try {
+    await WatchHistoryRepo.upsertWatchHistory(videoId, title, channelName, channelId, durationSeconds, watchedSeconds, thumbnailUrl);
+    res.status(201).json({ message: `Watch history entry added/updated for video ${videoId}` });
+  } catch (error) {
+    console.error(`API Error POST /api/watch-history (videoId: ${videoId}):`, error);
+    res.status(500).json({ error: `Failed to add/update watch history for video ${videoId}` });
+  }
+});
+
+app.put('/api/watch-history/:videoId/progress', async (req, res) => {
+  const { videoId } = req.params;
+  const { watchedSeconds } = req.body;
+  if (!videoId) {
+    return res.status(400).json({ error: 'Missing videoId in request parameters' });
+  }
+  if (typeof watchedSeconds !== 'number') {
+    return res.status(400).json({ error: 'Missing or invalid watchedSeconds in request body' });
+  }
+  try {
+    await WatchHistoryRepo.updateWatchProgress(videoId, watchedSeconds);
+    res.status(200).json({ message: `Watch progress updated for video ${videoId}` });
+  } catch (error) {
+    console.error(`API Error PUT /api/watch-history/${videoId}/progress:`, error);
+    res.status(500).json({ error: `Failed to update watch progress for video ${videoId}` });
+  }
+});
+
+app.delete('/api/watch-history/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId) {
+    return res.status(400).json({ error: 'Missing videoId in request parameters' });
+  }
+  try {
+    await WatchHistoryRepo.deleteWatchHistoryEntry(videoId);
+    res.status(200).json({ message: `Watch history entry deleted for video ${videoId}` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/watch-history/${videoId}:`, error);
+    res.status(500).json({ error: `Failed to delete watch history entry for video ${videoId}` });
+  }
+});
+
+app.delete('/api/watch-history', async (req, res) => {
+  try {
+    await WatchHistoryRepo.clearWatchHistory();
+    res.status(200).json({ message: 'Watch history cleared successfully.' });
+  } catch (error) {
+    console.error('API Error DELETE /api/watch-history:', error);
+    res.status(500).json({ error: 'Failed to clear watch history' });
+  }
+});
+
+// TODO: Remove the placeholder comment now that routes are added
 
 // Start server
 app.listen(port, () => {
