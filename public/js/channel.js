@@ -104,7 +104,7 @@ async function fetchChannelContent(channelId, contentType, continuation = null) 
   // TODO: Add Load More button and handle its display
 
   try {
-    let apiUrl = `/api/channel/${channelId}/${contentType}`;
+    let apiUrl = `/channel/api/${channelId}/${contentType}`;
     if (continuation) {
       apiUrl += `?continuation=${encodeURIComponent(continuation)}`;
     }
@@ -213,9 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // TODO: Add infinite scroll or load more button listener
-
-  // Initial call to load videos
-  loadVideos();
 });
 
 // === Subscribe/Unsubscribe Logic ===
