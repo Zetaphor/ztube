@@ -18,12 +18,20 @@ function createVideoCard(video) {
 
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
   const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
-  const duration = video.duration || '0:00';
-  const views = video.viewCount || '0 views';
-  const uploadedAt = video.uploadedAt || 'Unknown date';
+  let duration = video.duration || '0:00';
+  let views = video.viewCount || '0 views';
+  let uploadedAt = video.uploadedAt || 'Unknown date';
 
   card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
+
+  // Check if it looks like a livestream
+  const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
+
+  if (isLivestream) {
+    uploadedAt = ''; // Don't show upload date for livestreams
+    duration = '🔴 LIVE'; // Set duration text for live
+  }
 
   // When clicking a video card on the channel page, call the global loadAndDisplayVideo
   card.onclick = () => {
@@ -47,12 +55,12 @@ function createVideoCard(video) {
     `<span class="truncate">${channelNameText}${verifiedBadge}</span>`;
 
   card.innerHTML = `
-        <div class="video-thumbnail">
-            <img src="${thumbnail}" alt="${video.title}" loading="lazy" class="w-full h-full object-cover">
-            <span class="video-duration">${duration}</span>
+        <div class="video-thumbnail relative">
+            <img src="${thumbnail}" alt="${video.title}" loading="lazy" class="w-full h-full object-cover aspect-video">
+            ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''}
         </div>
         <div class="p-3">
-            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm">${video.title || 'Untitled'}</h3>
+            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${video.title || 'Untitled'}</h3>
             <div class="flex items-center mt-1">
                 <!-- Hide avatar/channel name inside the card when on channel page -->
                 <!--
@@ -63,9 +71,10 @@ function createVideoCard(video) {
                     </div>
                 </div>
                 -->
-                <div class="video-meta text-zinc-400 text-xs mt-0.5 w-full">
-                     <span title="${views}">${views}</span>
-                     <span title="${uploadedAt}">${uploadedAt}</span>
+                <div class="video-meta text-zinc-400 text-xs mt-0.5 w-full flex flex-wrap gap-x-2">
+                     ${views ? `<span title="${views}">${views}</span>` : ''}
+                     ${views && uploadedAt ? '<span class="separator">•</span>' : ''}
+                     ${uploadedAt ? `<span title="${uploadedAt}">${uploadedAt}</span>` : ''}
                  </div>
             </div>
         </div>

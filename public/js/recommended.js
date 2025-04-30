@@ -15,11 +15,19 @@ function createRecommendedVideoCard(video) {
   card.className = 'recommended-video-card flex gap-2 cursor-pointer hover:bg-zinc-700/50 p-1 rounded';
 
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
-  const duration = video.duration || '';
-  const views = video.viewCount || '';
-  const uploadedAt = video.uploadedAt || '';
+  let duration = video.duration || '';
+  let views = video.viewCount || '';
+  let uploadedAt = video.uploadedAt || '';
   const channelNameText = video.channel?.name || 'Unknown';
   const channelId = video.channel?.id;
+
+  // Check if it looks like a livestream
+  const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
+
+  if (isLivestream) {
+    uploadedAt = ''; // Don't show upload date for livestreams
+    duration = '🔴 LIVE';
+  }
 
   // Calls the global load function, passes null for element
   // Ensure window.loadAndDisplayVideo is globally available or passed in

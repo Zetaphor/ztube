@@ -240,11 +240,19 @@ function createVideoCard(video) {
   card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105';
 
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
-  const duration = video.duration || '';
-  const views = video.viewCount || '';
-  const uploadedAt = video.uploadedAt || '';
+  let duration = video.duration || '';
+  let views = video.viewCount || '';
+  let uploadedAt = video.uploadedAt || '';
 
   card.dataset.uploadedat = uploadedAt;
+
+  // Check if it looks like a livestream
+  const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
+
+  if (isLivestream) {
+    uploadedAt = ''; // Don't show upload date for livestreams
+    duration = '🔴 LIVE'; // Set duration text for live
+  }
 
   card.onclick = () => window.loadAndDisplayVideo(video.id, card);
 
