@@ -452,8 +452,8 @@ function createVideoCard(video) {
             <!-- Watch History Overlay -->
             <div class="watch-history-overlay absolute inset-0 bg-black/60 hidden group-hover:opacity-0 transition-opacity duration-200"></div>
             <!-- Watch History Progress Bar -->
-            <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden">
-                <div class="watch-history-progress-bar h-full bg-red-700"></div>
+            <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-zinc-600 hidden">
+                <div class="watch-history-progress-bar h-full bg-green-600"></div>
             </div>
             <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
@@ -808,12 +808,13 @@ function updateWatchHistoryUI(cardElement, historyData) {
     // Calculate progress percentage, handle potential division by zero
     const progressPercent = (duration && duration > 0) ? Math.min(100, (watched / duration) * 100) : 0;
 
+    // Apply the calculated progress percentage FIRST
     progressBar.style.width = `${progressPercent}%`;
 
     // Consider fully watched if within a few seconds of the end or over 95% watched
     const fullyWatchedThreshold = duration ? Math.max(duration - 5, duration * 0.95) : Infinity;
     if (watched >= fullyWatchedThreshold) {
-      progressBar.style.width = '100%'; // Show as fully watched
+      progressBar.style.width = '100%'; // THEN override to 100% if fully watched
       // Optionally, change the color or style for fully watched
       // progressBar.style.backgroundColor = '#someOtherColor';
     }
