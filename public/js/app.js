@@ -457,8 +457,8 @@ function createVideoCard(video) {
             </div>
             <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
-                <button class="remove-history-btn thumbnail-icon-btn hidden" title="Remove from History">
-                    <i class="fas fa-trash-alt"></i>
+                <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
+                    <i class="fas fa-eye-slash"></i>
                 </button>
                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
                     <i class="fas fa-plus"></i>
@@ -830,7 +830,7 @@ function updateWatchHistoryUI(cardElement, historyData) {
   if (newRemoveHistoryBtn) newRemoveHistoryBtn.disabled = false; // Ensure it's enabled if no listener was added or on error recovery
   const icon = newRemoveHistoryBtn?.querySelector('i');
   if (icon && icon.classList.contains('fa-spinner')) {
-    icon.className = 'fas fa-trash-alt'; // Restore original icon if stuck loading
+    icon.className = 'fas fa-eye-slash'; // Restore original icon if stuck loading
   }
   // --- End Restore Button State ---
 }

@@ -59,8 +59,8 @@ function createRecommendedVideoCard(video) {
         </div>
         <!-- Thumbnail Hover Icons -->
         <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
-          <button class="remove-history-btn thumbnail-icon-btn hidden" title="Remove from History">
-            <i class="fas fa-trash-alt"></i>
+          <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
+            <i class="fas fa-eye-slash"></i>
           </button>
           <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
             <i class="fas fa-plus"></i>

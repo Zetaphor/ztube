@@ -95,7 +95,7 @@ function displayPlaylists(playlists) {
                     <i class="fas fa-times"></i>
                 </button>
                 <button class="delete-btn text-zinc-400 hover:text-red-500 text-sm" title="Delete Playlist">
-                    <i class="fas fa-trash-alt"></i>
+                    <i class="fas fa-trash"></i>
                 </button>
             </div>
         `;
