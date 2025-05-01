@@ -20,21 +20,56 @@ function extractVideoId(url) {
 
 // Start the Express server as a separate Node.js process
 function startServer() {
+  // Determine the correct path to server.js based on environment
+  let serverPath;
+  if (isDev) {
+    // In development, server.js is relative to the project root
+    serverPath = path.join(__dirname, 'src', 'server.js');
+    console.log(`[Main Process] Starting server in dev mode: ${serverPath}`);
+  } else {
+    // In production (packaged), server.js is unpacked directly into resources/app.asar.unpacked
+    serverPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'src', 'server.js'); // Corrected unpacked path
+    console.log(`[Main Process] Starting server in prod mode (unpacked): ${serverPath}`);
+  }
 
-  // Use the correct path to the server file
-  const serverPath = path.join(__dirname, 'src', 'server.js');
+  // Check if the server file actually exists at the determined path
+  if (!fs.existsSync(serverPath)) {
+    console.error(`[Main Process] Error: Server file not found at ${serverPath}`);
+    // Optionally, show an error dialog to the user
+    // dialog.showErrorBox('Error', `Could not find the server file at ${serverPath}`);
+    app.quit(); // Exit if the server can't be found
+    return;
+  }
+
 
   // Spawn the server as a child process
+  console.log(`[Main Process] Spawning node process with: ${serverPath}`);
   serverProcess = spawn('node', [serverPath], {
-    stdio: 'inherit'
+    //stdio: 'inherit' // 'inherit' might cause issues in packaged apps, let's try piping
+    stdio: ['pipe', 'pipe', 'pipe'] // Pipe stdout, stderr, stdin
   });
 
+  // Log server output for debugging
+  serverProcess.stdout.on('data', (data) => {
+    console.log(`[Server STDOUT]: ${data}`);
+  });
+  serverProcess.stderr.on('data', (data) => {
+    console.error(`[Server STDERR]: ${data}`);
+  });
+
+
   serverProcess.on('error', (error) => {
-    console.error('Failed to start server process:', error);
+    console.error('[Main Process] Failed to start server process:', error);
+    // Show error to user?
   });
 
   serverProcess.on('close', (code) => {
-    console.info(`Server process exited with code ${code}`);
+    console.info(`[Main Process] Server process exited with code ${code}`);
+    // Handle unexpected server exit?
+    if (code !== 0 && code !== null) {
+      console.error(`[Main Process] Server process exited unexpectedly with code ${code}.`);
+      // Optionally show error or try to restart
+    }
   });
 }
 

@@ -2,6 +2,10 @@
   "name": "ztube",
   "version": "1.0.0",
   "description": "A full-featured YouTube client",
+  "author": {
+    "name": "Zetaphor",
+    "email": "zetaphor@hey.com"
+  },
   "main": "main.cjs",
   "type": "module",
   "scripts": {
@@ -45,6 +49,10 @@
       "!**/.{git,svn,github,hg}/**",
       "!.env",
       "!.env.example"
+    ],
+    "asarUnpack": [
+      "**/src/**",
+      "**/node_modules/**"
     ],
     "directories": {
       "buildResources": "resources"
