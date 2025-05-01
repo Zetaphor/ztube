@@ -9,50 +9,6 @@ let currentContentType = 'videos'; // Default to videos
 let isLoading = false;
 let videosContinuation = null;
 
-// === Helper to Update Watch Indicator State (Copied from app.js) ===
-function updateWatchIndicator(cardElement) {
-  const videoId = cardElement.dataset.videoId;
-  const thumbnailDiv = cardElement.querySelector('.video-thumbnail');
-
-  if (!thumbnailDiv || !videoId) return;
-
-  // Remove existing indicators first
-  thumbnailDiv.querySelector('.watched-overlay')?.remove();
-  thumbnailDiv.querySelector('.watched-progress-bar')?.remove();
-
-  // Ensure watchHistoryProgress exists on window
-  if (window.watchHistoryProgress && window.watchHistoryProgress.has(videoId)) {
-    const historyData = window.watchHistoryProgress.get(videoId);
-    const watchedSeconds = historyData.watchedSeconds || 0;
-    // Get duration from the card dataset if available, otherwise from history data
-    const durationSeconds = parseFloat(cardElement.dataset.durationSeconds) || historyData.durationSeconds || 0;
-
-    if (durationSeconds > 0 && watchedSeconds > 0) {
-      // Add Overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'watched-overlay';
-      thumbnailDiv.appendChild(overlay);
-
-      // Add Progress Bar
-      const progressBarContainer = document.createElement('div');
-      progressBarContainer.className = 'watched-progress-bar';
-      const progressBarInner = document.createElement('div');
-      progressBarInner.className = 'watched-progress-bar-inner';
-
-      // Calculate progress, ensuring it's between 0 and 100
-      let progressPercent = (watchedSeconds / durationSeconds) * 100;
-      progressPercent = Math.min(100, Math.max(0, progressPercent));
-      // Consider a video fully watched if > 95% watched
-      if (progressPercent > 95) progressPercent = 100;
-
-      progressBarInner.style.width = `${progressPercent}%`;
-
-      progressBarContainer.appendChild(progressBarInner);
-      thumbnailDiv.appendChild(progressBarContainer);
-    }
-  }
-}
-
 // --- Utility Functions (Copied from app.js - consider refactoring to shared file later) ---
 
 function createVideoCard(video) {
@@ -67,7 +23,6 @@ function createVideoCard(video) {
   let uploadedAt = video.uploadedAt || 'Unknown date';
   const videoTitle = video.title || 'Untitled'; // Store title
   const channelNameText = video.channel?.name || 'Unknown'; // Store channel name
-  const durationSeconds = video.durationSeconds || 0; // Add duration seconds
 
   // Add video data to dataset
   card.dataset.videoId = video.id;
@@ -75,7 +30,6 @@ function createVideoCard(video) {
   card.dataset.videoTitle = videoTitle;
   card.dataset.channelName = channelNameText;
   card.dataset.thumbnailUrl = thumbnail;
-  card.dataset.durationSeconds = durationSeconds; // Add duration seconds to dataset
 
   // Check if it looks like a livestream
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
@@ -108,7 +62,13 @@ function createVideoCard(video) {
   card.innerHTML = `
         <div class="video-thumbnail relative">
             <img src="${thumbnail}" alt="${videoTitle}" loading="lazy" class="w-full h-full object-cover aspect-video">
-            ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''}
+            ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded z-10">${duration}</span>` : ''}
+            <!-- Watch History Overlay -->
+            <div class="watch-history-overlay absolute inset-0 bg-black/60 hidden group-hover:opacity-0 transition-opacity duration-200"></div>
+            <!-- Watch History Progress Bar -->
+            <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden">
+                <div class="watch-history-progress-bar h-full bg-red-700"></div>
+            </div>
             <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
@@ -144,11 +104,6 @@ function createVideoCard(video) {
             <i class="fas fa-plus"></i>
         </button>
     `;
-
-  // Apply watch indicator immediately if history is already loaded
-  if (window.watchHistoryLoaded) {
-    updateWatchIndicator(card);
-  }
 
   // --- Add Listeners for Hover Icons (Copied from app.js) ---
   const bookmarkBtn = card.querySelector('.bookmark-btn');
@@ -266,6 +221,14 @@ async function fetchChannelContent(channelId, contentType, continuation = null) 
           const card = createVideoCard(video);
           channelContent.appendChild(card);
         });
+        // Process the newly added channel video cards
+        const newlyAddedCards = Array.from(channelContent.children).slice(continuation ? -data.videos.length : 0);
+
+        if (window.processCardsForWatchHistory) {
+          window.processCardsForWatchHistory(newlyAddedCards);
+        } else {
+          console.warn('processCardsForWatchHistory function not found on window');
+        }
       }
       videosContinuation = data.continuation; // Store continuation for videos
     }
@@ -290,9 +253,6 @@ async function fetchChannelContent(channelId, contentType, continuation = null) 
   } finally {
     isLoading = false;
   }
-
-  // Trigger UI update after fetching content
-  document.dispatchEvent(new Event('uiNeedsChannelWatchUpdate'));
 }
 
 function handleTabClick(event) {
@@ -321,19 +281,6 @@ function handleTabClick(event) {
 
   // Fetch content for the new tab
   fetchChannelContent(currentChannelId, currentContentType);
-}
-
-// --- Helper to update all channel cards ---
-function updateAllChannelWatchIndicators() {
-  const container = document.getElementById('channelContent');
-  if (!container) return;
-  const cards = container.querySelectorAll('.video-card');
-  console.log(`[Channel] Found ${cards.length} cards to update watch status.`);
-  cards.forEach(card => {
-    if (card.dataset.videoId) {
-      updateWatchIndicator(card);
-    }
-  });
 }
 
 // --- Initialization ---
@@ -365,19 +312,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // TODO: Add infinite scroll or load more button listener
-
-  // Listen for watch history loaded event
-  document.addEventListener('watchHistoryLoaded', () => {
-    console.log("[Channel] Received watchHistoryLoaded event. Updating watch indicators.");
-    updateAllChannelWatchIndicators();
-  });
-
-  // Listen for event to update indicators after display
-  document.addEventListener('uiNeedsChannelWatchUpdate', () => {
-    if (window.watchHistoryLoaded) {
-      updateAllChannelWatchIndicators();
-    }
-  });
 });
 
 // === Subscribe/Unsubscribe Logic ===

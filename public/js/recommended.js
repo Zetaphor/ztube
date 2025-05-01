@@ -2,50 +2,6 @@ import { showError } from './utils.js';
 // DOM Elements
 const getRecommendedContainer = () => document.getElementById('recommendedVideos')?.querySelector('.space-y-3');
 
-// === Helper to Update Watch Indicator State (Copied from app.js) ===
-function updateWatchIndicator(cardElement) {
-  const videoId = cardElement.dataset.videoId;
-  const thumbnailDiv = cardElement.querySelector('.recommended-thumbnail'); // Use specific class
-
-  if (!thumbnailDiv || !videoId) return;
-
-  // Remove existing indicators first
-  thumbnailDiv.querySelector('.watched-overlay')?.remove();
-  thumbnailDiv.querySelector('.watched-progress-bar')?.remove();
-
-  // Ensure watchHistoryProgress exists on window
-  if (window.watchHistoryProgress && window.watchHistoryProgress.has(videoId)) {
-    const historyData = window.watchHistoryProgress.get(videoId);
-    const watchedSeconds = historyData.watchedSeconds || 0;
-    // Get duration from the card dataset if available, otherwise from history data
-    const durationSeconds = parseFloat(cardElement.dataset.durationSeconds) || historyData.durationSeconds || 0;
-
-    if (durationSeconds > 0 && watchedSeconds > 0) {
-      // Add Overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'watched-overlay';
-      thumbnailDiv.appendChild(overlay);
-
-      // Add Progress Bar
-      const progressBarContainer = document.createElement('div');
-      progressBarContainer.className = 'watched-progress-bar';
-      const progressBarInner = document.createElement('div');
-      progressBarInner.className = 'watched-progress-bar-inner';
-
-      // Calculate progress, ensuring it's between 0 and 100
-      let progressPercent = (watchedSeconds / durationSeconds) * 100;
-      progressPercent = Math.min(100, Math.max(0, progressPercent));
-      // Consider a video fully watched if > 95% watched
-      if (progressPercent > 95) progressPercent = 100;
-
-      progressBarInner.style.width = `${progressPercent}%`;
-
-      progressBarContainer.appendChild(progressBarInner);
-      thumbnailDiv.appendChild(progressBarContainer);
-    }
-  }
-}
-
 // === Recommended Videos Functions ===
 
 /**
@@ -65,14 +21,12 @@ function createRecommendedVideoCard(video) {
   const channelNameText = video.channel?.name || 'Unknown';
   const channelId = video.channel?.id;
   const videoTitle = video.title || 'Untitled'; // Store title
-  const durationSeconds = video.durationSeconds || 0; // Store duration seconds
 
   // Add video data to dataset for easy access
   card.dataset.videoId = video.id;
   card.dataset.videoTitle = videoTitle;
   card.dataset.channelName = channelNameText;
   card.dataset.thumbnailUrl = thumbnail; // Use the fetched thumbnail
-  card.dataset.durationSeconds = durationSeconds; // Add duration to dataset
 
   // Check if it looks like a livestream
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
@@ -96,7 +50,13 @@ function createRecommendedVideoCard(video) {
   card.innerHTML = `
       <div class="video-thumbnail recommended-thumbnail relative flex-shrink-0 w-40">
         <img src="${thumbnail}" alt="${video.title || 'Thumbnail'}" loading="lazy" class="w-full h-auto object-cover rounded-md aspect-video">
-        ${duration ? `<span class="recommended-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 rounded">${duration}</span>` : ''}
+        ${duration ? `<span class="recommended-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 rounded z-10">${duration}</span>` : ''}
+        <!-- Watch History Overlay -->
+        <div class="watch-history-overlay absolute inset-0 bg-black/60 hidden group-hover:opacity-0 transition-opacity duration-200 rounded-md"></div>
+        <!-- Watch History Progress Bar -->
+        <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden rounded-b-md">
+            <div class="watch-history-progress-bar h-full bg-red-700"></div>
+        </div>
         <!-- Thumbnail Hover Icons -->
         <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
           <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
@@ -124,11 +84,6 @@ function createRecommendedVideoCard(video) {
         <i class="fas fa-plus"></i>
       </button>
     `;
-
-  // Apply watch indicator immediately if history is already loaded
-  if (window.watchHistoryLoaded) {
-    updateWatchIndicator(card);
-  }
 
   // --- Add Listeners for Hover Icons (Copied from app.js) ---
   const bookmarkBtn = card.querySelector('.bookmark-btn');
@@ -214,8 +169,12 @@ function displayRecommendedVideos(videos) {
     recommendedContainer.appendChild(card);
   });
 
-  // Update indicators after displaying recommended videos
-  document.dispatchEvent(new Event('uiNeedsRecommendedWatchUpdate'));
+  // Process the newly added recommended cards for watch history
+  if (window.processCardsForWatchHistory) {
+    window.processCardsForWatchHistory(recommendedContainer.childNodes);
+  } else {
+    console.warn('processCardsForWatchHistory function not found on window');
+  }
 }
 
 /**
@@ -262,30 +221,4 @@ export function clearRecommendedVideos() {
   if (recommendedContainer) {
     recommendedContainer.innerHTML = ''; // Clear recommendations
   }
-}
-
-// Listen for watch history loaded event
-document.addEventListener('watchHistoryLoaded', () => {
-  console.log("[Recommended] Received watchHistoryLoaded event. Updating watch indicators.");
-  updateAllRecommendedWatchIndicators();
-});
-
-// Listen for event to update indicators after display
-document.addEventListener('uiNeedsRecommendedWatchUpdate', () => {
-  if (window.watchHistoryLoaded) {
-    updateAllRecommendedWatchIndicators();
-  }
-});
-
-// Helper to update all recommended cards
-function updateAllRecommendedWatchIndicators() {
-  const container = getRecommendedContainer();
-  if (!container) return;
-  const cards = container.querySelectorAll('.recommended-video-card');
-  console.log(`[Recommended] Found ${cards.length} cards to update watch status.`);
-  cards.forEach(card => {
-    if (card.dataset.videoId) {
-      updateWatchIndicator(card);
-    }
-  });
 }

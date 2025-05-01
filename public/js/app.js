@@ -16,8 +16,13 @@ const videoPlayerAddToPlaylistBtn = document.getElementById('addToPlaylistBtnPla
 // Global variables / State (App Level)
 let currentVideoId = null;
 let currentVideoDetailsForPlaylist = {}; // Store details needed for adding to playlist
-window.watchHistoryProgress = new Map(); // Map videoId -> { watchedSeconds, durationSeconds }
-window.watchHistoryLoaded = false;
+
+// --- Watch History Card Update ---
+// Debounce mechanism for batch fetching history
+let historyCheckTimeout = null;
+const HISTORY_CHECK_DEBOUNCE_MS = 500; // Wait 500ms after last request before fetching
+let pendingHistoryChecks = new Set(); // Store video IDs needing history check
+let knownHistoryStatus = {}; // Cache fetched history status (video_id: { watchedSeconds, durationSeconds })
 
 // === Helper to Update Bookmark Icon State ===
 function updateBookmarkIconState(cardElement) {
@@ -43,79 +48,6 @@ function updateBookmarkIconState(cardElement) {
       bookmarkBtn.title = "Add to Watch Later";
       bookmarkBtn.classList.remove('visible');
     }
-  }
-}
-
-// === Helper to Update Watch Indicator State ===
-function updateWatchIndicator(cardElement) {
-  const videoId = cardElement.dataset.videoId;
-  const thumbnailDiv = cardElement.querySelector('.video-thumbnail');
-
-  if (!thumbnailDiv || !videoId) return;
-
-  // Remove existing indicators first
-  thumbnailDiv.querySelector('.watched-overlay')?.remove();
-  thumbnailDiv.querySelector('.watched-progress-bar')?.remove();
-
-  if (window.watchHistoryProgress.has(videoId)) {
-    const historyData = window.watchHistoryProgress.get(videoId);
-    const watchedSeconds = historyData.watchedSeconds || 0;
-    // Get duration from the card dataset if available, otherwise from history data
-    const durationSeconds = parseFloat(cardElement.dataset.durationSeconds) || historyData.durationSeconds || 0;
-
-    if (durationSeconds > 0 && watchedSeconds > 0) {
-      // Add Overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'watched-overlay';
-      thumbnailDiv.appendChild(overlay);
-
-      // Add Progress Bar
-      const progressBarContainer = document.createElement('div');
-      progressBarContainer.className = 'watched-progress-bar';
-      const progressBarInner = document.createElement('div');
-      progressBarInner.className = 'watched-progress-bar-inner';
-
-      // Calculate progress, ensuring it's between 0 and 100
-      let progressPercent = (watchedSeconds / durationSeconds) * 100;
-      progressPercent = Math.min(100, Math.max(0, progressPercent));
-      // Consider a video fully watched if > 95% watched
-      if (progressPercent > 95) progressPercent = 100;
-
-      progressBarInner.style.width = `${progressPercent}%`;
-
-      progressBarContainer.appendChild(progressBarInner);
-      thumbnailDiv.appendChild(progressBarContainer);
-    }
-  }
-}
-
-// === Fetch Watch History ===
-async function loadWatchHistoryProgress() {
-  try {
-    // Fetch a decent number of recent history entries
-    const response = await fetch('/api/watch-history?limit=500');
-    if (!response.ok) {
-      console.warn(`Failed to fetch watch history: ${response.status}`);
-      return; // Don't block further execution
-    }
-    const historyEntries = await response.json();
-    window.watchHistoryProgress.clear(); // Clear previous entries if any
-    historyEntries.forEach(entry => {
-      if (entry.video_id && typeof entry.watched_seconds === 'number' && typeof entry.duration_seconds === 'number') {
-        window.watchHistoryProgress.set(entry.video_id, {
-          watchedSeconds: entry.watched_seconds,
-          durationSeconds: entry.duration_seconds
-        });
-      }
-    });
-    console.log(`[Watch History] Loaded ${window.watchHistoryProgress.size} progress entries.`);
-  } catch (error) {
-    console.error('[Watch History] Error fetching progress:', error);
-  } finally {
-    window.watchHistoryLoaded = true;
-    // Dispatch event AFTER setting the flag
-    document.dispatchEvent(new CustomEvent('watchHistoryLoaded'));
-    console.log("[Watch History] Dispatched watchHistoryLoaded event.");
   }
 }
 
@@ -416,6 +348,8 @@ async function performSearch() {
       displayResults(data, mainContentArea);
       // Update bookmark icons after displaying results
       document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
+      // Process newly displayed cards for watch history
+      processCardsForWatchHistory(mainContentArea.querySelectorAll('.video-card'));
     } catch (error) {
       console.error('Search error:', error);
       // Display error within the main content area, replacing its content
@@ -454,9 +388,13 @@ function displayResults(results, mainContentElement) {
   // Append the new grid container to the main content element
   mainContentElement.appendChild(gridContainer);
 
-  // Update indicators after displaying results
-  document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
-  document.dispatchEvent(new Event('uiNeedsWatchUpdate')); // Dispatch watch update event
+  // Update bookmark icons after displaying results
+  // document.dispatchEvent(new Event('uiNeedsBookmarkUpdate')); // Handled by specific pages now
+  // Process any initially visible cards (e.g., on index page if content is pre-loaded, or after search)
+  const initialCards = document.querySelectorAll('#main-content > main > #content > .video-card');
+  if (initialCards.length > 0) {
+    processCardsForWatchHistory(initialCards);
+  }
 }
 
 function createVideoCard(video) {
@@ -466,17 +404,15 @@ function createVideoCard(video) {
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
   let duration = video.duration || '';
   let views = video.viewCount || '';
-  let uploadedAt = video.uploadedAt || 'Unknown date';
+  let uploadedAt = video.uploadedAt || '';
   const videoTitle = video.title || 'Untitled';
   const channelNameText = video.channel?.name || 'Unknown';
-  const durationSeconds = video.durationSeconds || 0; // Store duration in seconds
 
   card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
   card.dataset.videoTitle = videoTitle;
   card.dataset.channelName = channelNameText;
   card.dataset.thumbnailUrl = thumbnail;
-  card.dataset.durationSeconds = durationSeconds; // Add duration to dataset
 
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
 
@@ -512,7 +448,13 @@ function createVideoCard(video) {
   card.innerHTML = `
         <div class="video-thumbnail relative">
             <img src="${thumbnail}" alt="${videoTitle} thumbnail" loading="lazy" class="w-full h-full object-cover aspect-video">
-            ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''}
+            ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded z-10">${duration}</span>` : ''}
+            <!-- Watch History Overlay -->
+            <div class="watch-history-overlay absolute inset-0 bg-black/60 hidden group-hover:opacity-0 transition-opacity duration-200"></div>
+            <!-- Watch History Progress Bar -->
+            <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden">
+                <div class="watch-history-progress-bar h-full bg-red-700"></div>
+            </div>
             <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
@@ -545,11 +487,6 @@ function createVideoCard(video) {
             <i class="fas fa-plus"></i>
         </button>
     `;
-
-  // Apply watch indicator immediately if history is already loaded
-  if (window.watchHistoryLoaded) {
-    updateWatchIndicator(card);
-  }
 
   // --- Add Listeners for Hover Icons ---
   const bookmarkBtn = card.querySelector('.bookmark-btn');
@@ -706,37 +643,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   // --- End Event Listener ---
 
-  // --- Event Listener for Updating Watch Indicators ---
-  const updateAllVisibleWatchIndicators = () => {
-    const cards = document.querySelectorAll('#main-content > main > #content > .video-card');
-    console.log(`[app.js] Found ${cards.length} video cards in #content to update watch status.`);
-    cards.forEach(card => {
-      if (card.dataset.videoId) {
-        updateWatchIndicator(card);
-      }
-    });
-  };
-
-  // Listen for watch history loaded event
-  document.addEventListener('watchHistoryLoaded', () => {
-    console.log("[app.js] Received watchHistoryLoaded event. Updating watch indicators in #content.");
-    updateAllVisibleWatchIndicators();
-  });
-
-  // Listen for a custom event that signals UI might need an update (e.g., after search results display)
-  document.addEventListener('uiNeedsWatchUpdate', () => {
-    console.log("[app.js] Received uiNeedsWatchUpdate event. Updating watch indicators.");
-    // This check ensures we don't try to update before the data is ready
-    if (window.watchHistoryLoaded) {
-      updateAllVisibleWatchIndicators();
-    } else {
-      console.log("[app.js] Watch history info not yet loaded, skipping immediate update.");
-      // The 'watchHistoryLoaded' listener will handle it later.
-    }
-  });
-
-  // Load watch history progress on startup
-  loadWatchHistoryProgress();
+  // Process any initially visible cards (e.g., on index page if content is pre-loaded, or after search)
+  const initialCards = document.querySelectorAll('#main-content > main > #content > .video-card');
+  if (initialCards.length > 0) {
+    processCardsForWatchHistory(initialCards);
+  }
 });
 
 // === Subscribe/Unsubscribe Logic ===
@@ -815,3 +726,150 @@ async function setupSubscribeButton(buttonElement) {
     }
   });
 }
+
+// --- Watch History Update Functions ---
+
+/**
+ * Updates the visual appearance of a single video card based on its watch history.
+ * @param {HTMLElement} cardElement - The video card element.
+ * @param {object|null} historyData - The history object { watchedSeconds, durationSeconds } or null.
+ */
+function updateWatchHistoryUI(cardElement, historyData) {
+  const overlay = cardElement.querySelector('.watch-history-overlay');
+  const progressContainer = cardElement.querySelector('.watch-history-progress');
+  const progressBar = cardElement.querySelector('.watch-history-progress-bar');
+
+  if (!overlay || !progressContainer || !progressBar) {
+    // console.warn('Watch history UI elements not found in card:', cardElement);
+    return;
+  }
+
+  if (historyData && historyData.watchedSeconds > 0) {
+    overlay.classList.remove('hidden');
+    progressContainer.classList.remove('hidden');
+
+    const duration = historyData.durationSeconds;
+    const watched = historyData.watchedSeconds;
+
+    // Calculate progress percentage, handle potential division by zero
+    const progressPercent = (duration && duration > 0) ? Math.min(100, (watched / duration) * 100) : 0;
+
+    progressBar.style.width = `${progressPercent}%`;
+
+    // Consider fully watched if within a few seconds of the end or over 95% watched
+    const fullyWatchedThreshold = duration ? Math.max(duration - 5, duration * 0.95) : Infinity;
+    if (watched >= fullyWatchedThreshold) {
+      progressBar.style.width = '100%'; // Show as fully watched
+      // Optionally, change the color or style for fully watched
+      // progressBar.style.backgroundColor = '#someOtherColor';
+    }
+
+  } else {
+    // No history or watchedSeconds is 0
+    overlay.classList.add('hidden');
+    progressContainer.classList.add('hidden');
+    progressBar.style.width = '0%';
+  }
+}
+
+/**
+ * Fetches watch history status for a batch of video IDs.
+ * @param {string[]} videoIds - Array of video IDs.
+ */
+async function fetchAndUpdateWatchHistoryBatch(videoIds) {
+  if (!videoIds || videoIds.length === 0) return;
+
+  try {
+    const response = await fetch('/api/watch-history/batch-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoIds }),
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch batch history status: ${response.status}`);
+      return; // Don't update cache or UI on error
+    }
+
+    const batchStatus = await response.json();
+
+    // Update cache and UI for each video ID in the response
+    Object.keys(batchStatus).forEach(videoId => {
+      knownHistoryStatus[videoId] = batchStatus[videoId]; // Update cache
+      // --- Debug Logging ---
+      // const selector = `.video-card[data-video-id="${videoId}"], .recommended-video-card[data-video-id="${videoId}"]`;
+      // const cardsFound = document.querySelectorAll(selector);
+      // console.log(`[App.js] fetchAndUpdateWatchHistoryBatch - Updating UI for ${videoId}. Found ${cardsFound.length} cards with selector: ${selector}`, cardsFound);
+      // --- End Debug Logging ---
+      // Find all visible cards with this video ID and update their UI
+      // This might select cards across different sections (search, recommended, etc.)
+      const selector = `.video-card[data-video-id="${videoId}"], .recommended-video-card[data-video-id="${videoId}"]`;
+      const cardsFound = document.querySelectorAll(selector);
+      cardsFound.forEach(card => { // Use cardsFound directly
+        updateWatchHistoryUI(card, batchStatus[videoId]);
+      });
+    });
+
+  } catch (error) {
+    console.error('Error fetching/updating batch history:', error);
+  }
+}
+
+/**
+ * Adds video IDs to the pending check list and schedules a debounced fetch.
+ * @param {string[]} videoIds - Array of video IDs to check.
+ */
+function scheduleWatchHistoryCheck(videoIds) {
+  let needsFetch = false;
+  videoIds.forEach(id => {
+    // Only add if we don't already have cached status for it
+    if (id && !knownHistoryStatus.hasOwnProperty(id)) {
+      pendingHistoryChecks.add(id);
+      needsFetch = true;
+    }
+  });
+
+  if (!needsFetch) return; // Don't reset timeout if nothing new was added
+
+  // Clear existing timeout and set a new one
+  clearTimeout(historyCheckTimeout);
+  historyCheckTimeout = setTimeout(() => {
+    const idsToFetch = Array.from(pendingHistoryChecks);
+    pendingHistoryChecks.clear(); // Clear the set for the next batch
+    if (idsToFetch.length > 0) {
+      fetchAndUpdateWatchHistoryBatch(idsToFetch);
+    }
+  }, HISTORY_CHECK_DEBOUNCE_MS);
+}
+
+/**
+ * Processes a list of card elements, updating UI from cache or scheduling checks.
+ * @param {NodeListOf<Element>|Element[]} cards - A list of video card elements.
+ */
+function processCardsForWatchHistory(cards) {
+  const idsToCheck = [];
+  cards.forEach(card => {
+    const videoId = card.dataset.videoId;
+    if (videoId) {
+      if (knownHistoryStatus.hasOwnProperty(videoId)) {
+        // Use cached data immediately
+        updateWatchHistoryUI(card, knownHistoryStatus[videoId]);
+      } else {
+        // Add to the list to be fetched
+        idsToCheck.push(videoId);
+      }
+    }
+  });
+
+  if (idsToCheck.length > 0) {
+    scheduleWatchHistoryCheck(idsToCheck);
+  }
+}
+
+// --- End Watch History Update Functions ---
+
+// Expose for use by other modules (like subscriptions-page.js)
+window.processCardsForWatchHistory = processCardsForWatchHistory;
+
+// === DEFINE GLOBAL FUNCTION EARLY ===
+// Make videoCardElement optional and default to null

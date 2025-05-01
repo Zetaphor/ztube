@@ -96,4 +96,30 @@ router.delete('/', async (req, res) => {
   }
 });
 
+// Get watch history status for multiple videos
+router.post('/batch-status', async (req, res) => {
+  const { videoIds } = req.body;
+
+  if (!Array.isArray(videoIds) || videoIds.length === 0) {
+    return res.status(400).json({ error: 'Missing or invalid videoIds array in request body' });
+  }
+
+  // Basic sanitization/validation (optional, adjust as needed)
+  const validVideoIds = videoIds.filter(id => typeof id === 'string' && id.length > 0);
+
+  if (validVideoIds.length === 0) {
+    return res.status(400).json({ error: 'No valid video IDs provided' });
+  }
+
+  try {
+    const historyMap = await WatchHistoryRepo.getWatchHistoryBatch(validVideoIds);
+    // Convert Map to a plain object for JSON response
+    const historyObject = Object.fromEntries(historyMap);
+    res.json(historyObject);
+  } catch (error) {
+    console.error(`API Error POST /api/watch-history/batch-status for IDs [${validVideoIds.join(', ')}]:`, error);
+    res.status(500).json({ error: 'Failed to retrieve batch watch history status' });
+  }
+});
+
 export default router;

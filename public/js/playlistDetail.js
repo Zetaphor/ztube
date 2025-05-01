@@ -34,50 +34,6 @@ function showDetailError(message) {
   playlistDetailContainer.classList.add('hidden'); // Hide details on error
 }
 
-// === Helper to Update Watch Indicator State (Copied from app.js) ===
-function updateWatchIndicator(cardElement) {
-  const videoId = cardElement.dataset.videoId;
-  const thumbnailDiv = cardElement.querySelector('.video-thumbnail');
-
-  if (!thumbnailDiv || !videoId) return;
-
-  // Remove existing indicators first
-  thumbnailDiv.querySelector('.watched-overlay')?.remove();
-  thumbnailDiv.querySelector('.watched-progress-bar')?.remove();
-
-  // Ensure watchHistoryProgress exists on window
-  if (window.watchHistoryProgress && window.watchHistoryProgress.has(videoId)) {
-    const historyData = window.watchHistoryProgress.get(videoId);
-    const watchedSeconds = historyData.watchedSeconds || 0;
-    // Get duration from the card dataset if available, otherwise from history data
-    const durationSeconds = parseFloat(cardElement.dataset.durationSeconds) || historyData.durationSeconds || 0;
-
-    if (durationSeconds > 0 && watchedSeconds > 0) {
-      // Add Overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'watched-overlay';
-      thumbnailDiv.appendChild(overlay);
-
-      // Add Progress Bar
-      const progressBarContainer = document.createElement('div');
-      progressBarContainer.className = 'watched-progress-bar';
-      const progressBarInner = document.createElement('div');
-      progressBarInner.className = 'watched-progress-bar-inner';
-
-      // Calculate progress, ensuring it's between 0 and 100
-      let progressPercent = (watchedSeconds / durationSeconds) * 100;
-      progressPercent = Math.min(100, Math.max(0, progressPercent));
-      // Consider a video fully watched if > 95% watched
-      if (progressPercent > 95) progressPercent = 100;
-
-      progressBarInner.style.width = `${progressPercent}%`;
-
-      progressBarContainer.appendChild(progressBarInner);
-      thumbnailDiv.appendChild(progressBarContainer);
-    }
-  }
-}
-
 // Simple HTML escaping function
 function escapeHtml(unsafe) {
   if (unsafe === null || unsafe === undefined) return '';
@@ -177,21 +133,16 @@ function displayVideos(videos) {
     const card = createPlaylistVideoCard(video, index);
     playlistVideoList.appendChild(card);
   });
-
-  // Trigger UI update after displaying videos
-  document.dispatchEvent(new Event('uiNeedsPlaylistWatchUpdate'));
 }
 
 function createPlaylistVideoCard(video, index) {
   const card = document.createElement('div');
-  card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden relative group'; // Add group for remove button hover
+  card.className = 'video-card bg-zinc-800 rounded-lg shadow-md overflow-hidden relative'; // Add relative for button positioning
   card.dataset.videoId = video.video_id;
-  // Add duration seconds if available in the video object (needs API update)
-  // Assuming playlist endpoint now returns duration_seconds
-  card.dataset.durationSeconds = video.duration_seconds || 0;
 
   const thumbnail = video.thumbnail_url || '/img/default-video.png';
-  // Duration text (optional, if API provides it)
+  // We don't have duration from the playlist table, maybe fetch later or omit?
+  // const duration = video.duration || '';
   const channelNameText = video.channel_name || 'Unknown Channel';
   // We don't have channel ID here, so link is omitted for simplicity
   // const channelId = video.channel?.id;
@@ -201,6 +152,12 @@ function createPlaylistVideoCard(video, index) {
         <div class="video-thumbnail relative cursor-pointer" onclick="window.loadAndDisplayVideo('${video.video_id}', this.closest('.video-card'))">
             <img src="${thumbnail}" alt="${escapeHtml(video.title) || 'Video thumbnail'}" loading="lazy" class="w-full h-full object-cover aspect-video">
             <!-- ${duration ? `<span class="video-duration absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">${duration}</span>` : ''} -->
+             <!-- Watch History Overlay -->
+            <div class="watch-history-overlay absolute inset-0 bg-black/60 hidden group-hover:opacity-0 transition-opacity duration-200"></div>
+            <!-- Watch History Progress Bar -->
+            <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden">
+                <div class="watch-history-progress-bar h-full bg-red-700"></div>
+            </div>
         </div>
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-1 text-sm h-10 cursor-pointer hover:text-green-400" title="${escapeHtml(video.title)}" onclick="window.loadAndDisplayVideo('${video.video_id}', this.closest('.video-card'))">${escapeHtml(video.title) || 'Untitled'}</h3>
@@ -220,11 +177,6 @@ function createPlaylistVideoCard(video, index) {
             <i class="fas fa-times"></i>
         </button>
     `;
-
-  // Apply watch indicator immediately if history is already loaded
-  if (window.watchHistoryLoaded) {
-    updateWatchIndicator(card);
-  }
 
   // Add hover effect to show remove button
   card.addEventListener('mouseenter', () => card.classList.add('group'));
@@ -274,19 +226,6 @@ async function removeVideoFromPlaylist(videoIdToRemove) {
   }
 }
 
-// --- Helper to update all playlist cards ---
-function updateAllPlaylistWatchIndicators() {
-  const container = document.getElementById('playlistVideoList');
-  if (!container) return;
-  const cards = container.querySelectorAll('.video-card');
-  console.log(`[PlaylistDetail] Found ${cards.length} cards to update watch status.`);
-  cards.forEach(card => {
-    if (card.dataset.videoId) {
-      updateWatchIndicator(card);
-    }
-  });
-}
-
 // --- Initial Load & Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylistDetails();
@@ -294,17 +233,4 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sortOptions) {
     sortOptions.addEventListener('change', sortAndDisplayVideos);
   }
-
-  // Listen for watch history loaded event
-  document.addEventListener('watchHistoryLoaded', () => {
-    console.log("[PlaylistDetail] Received watchHistoryLoaded event. Updating watch indicators.");
-    updateAllPlaylistWatchIndicators();
-  });
-
-  // Listen for event to update indicators after display
-  document.addEventListener('uiNeedsPlaylistWatchUpdate', () => {
-    if (window.watchHistoryLoaded) {
-      updateAllPlaylistWatchIndicators();
-    }
-  });
 });

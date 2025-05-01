@@ -134,3 +134,42 @@ export const clearWatchHistory = () => {
     });
   });
 };
+
+/**
+ * Gets watch history entries for a batch of video IDs.
+ * @param {string[]} videoIds - An array of video IDs.
+ * @returns {Promise<Map<string, object|null>>} - A Map where keys are video IDs and values are history objects or null if not found.
+ */
+export const getWatchHistoryBatch = (videoIds) => {
+  return new Promise((resolve, reject) => {
+    if (!videoIds || videoIds.length === 0) {
+      return resolve(new Map());
+    }
+    // Create placeholders for the IN clause: (?, ?, ...)
+    const placeholders = videoIds.map(() => '?').join(',');
+    const sql = `
+      SELECT video_id, watched_seconds, duration_seconds
+      FROM watch_history
+      WHERE video_id IN (${placeholders})
+    `;
+
+    db.all(sql, videoIds, (err, rows) => {
+      if (err) {
+        console.error(`Error getting batch watch history for IDs [${videoIds.join(', ')}]:`, err.message);
+        return reject(err);
+      }
+      // Create a map for quick lookup
+      const historyMap = new Map();
+      videoIds.forEach(id => historyMap.set(id, null)); // Initialize all requested IDs with null
+      rows.forEach(row => {
+        if (row.video_id) {
+          historyMap.set(row.video_id, {
+            watchedSeconds: row.watched_seconds,
+            durationSeconds: row.duration_seconds,
+          });
+        }
+      });
+      resolve(historyMap);
+    });
+  });
+};

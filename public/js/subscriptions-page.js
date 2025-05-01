@@ -30,50 +30,6 @@ function updateBookmarkIconState(cardElement) {
   }
 }
 
-// === Helper to Update Watch Indicator State (Copied from app.js) ===
-function updateWatchIndicator(cardElement) {
-  const videoId = cardElement.dataset.videoId;
-  const thumbnailDiv = cardElement.querySelector('.video-thumbnail');
-
-  if (!thumbnailDiv || !videoId) return;
-
-  // Remove existing indicators first
-  thumbnailDiv.querySelector('.watched-overlay')?.remove();
-  thumbnailDiv.querySelector('.watched-progress-bar')?.remove();
-
-  // Ensure watchHistoryProgress exists on window
-  if (window.watchHistoryProgress && window.watchHistoryProgress.has(videoId)) {
-    const historyData = window.watchHistoryProgress.get(videoId);
-    const watchedSeconds = historyData.watchedSeconds || 0;
-    // Get duration from the card dataset if available, otherwise from history data
-    const durationSeconds = parseFloat(cardElement.dataset.durationSeconds) || historyData.durationSeconds || 0;
-
-    if (durationSeconds > 0 && watchedSeconds > 0) {
-      // Add Overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'watched-overlay';
-      thumbnailDiv.appendChild(overlay);
-
-      // Add Progress Bar
-      const progressBarContainer = document.createElement('div');
-      progressBarContainer.className = 'watched-progress-bar';
-      const progressBarInner = document.createElement('div');
-      progressBarInner.className = 'watched-progress-bar-inner';
-
-      // Calculate progress, ensuring it's between 0 and 100
-      let progressPercent = (watchedSeconds / durationSeconds) * 100;
-      progressPercent = Math.min(100, Math.max(0, progressPercent));
-      // Consider a video fully watched if > 95% watched
-      if (progressPercent > 95) progressPercent = 100;
-
-      progressBarInner.style.width = `${progressPercent}%`;
-
-      progressBarContainer.appendChild(progressBarInner);
-      thumbnailDiv.appendChild(progressBarContainer);
-    }
-  }
-}
-
 // Tab elements and content containers
 const videosTab = document.getElementById('videosTab');
 const shortsTab = document.getElementById('shortsTab');
@@ -124,32 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log("[Subscriptions] Default playlist info not yet loaded, skipping immediate update.");
     }
   });
-
-  // --- Event Listener for Updating Watch Indicators ---
-  const updateAllSubscriptionWatchIndicators = () => {
-    // Target only cards within the subscription videos container
-    const cards = videosContent?.querySelectorAll('.video-card') || [];
-    console.log(`[Subscriptions] Found ${cards.length} cards to update watch status.`);
-    cards.forEach(card => {
-      if (card.dataset.videoId) {
-        updateWatchIndicator(card);
-      }
-    });
-    // TODO: Update shorts cards if/when implemented
-  };
-
-  // Listen for the event dispatched when default playlist info is loaded
-  document.addEventListener('defaultPlaylistLoaded', () => {
-    console.log("[Subscriptions] Received defaultPlaylistLoaded event. Updating watch indicators.");
-    updateAllSubscriptionWatchIndicators();
-  });
-
-  // Listen for watch history loaded event
-  document.addEventListener('watchHistoryLoaded', () => {
-    console.log("[Subscriptions] Received watchHistoryLoaded event. Updating watch indicators.");
-    updateAllSubscriptionWatchIndicators();
-  });
-
   // --- End Event Listener Setup ---
 
   // Add Tab Listeners
@@ -327,6 +257,14 @@ function displaySubscriptionVideos() {
 
   currentVideoIndex += nextBatch.length;
 
+  // Process the newly added batch of cards for watch history
+  const newlyAddedCards = Array.from(videosContent.children).slice(-nextBatch.length);
+  if (window.processCardsForWatchHistory) {
+    window.processCardsForWatchHistory(newlyAddedCards);
+  } else {
+    console.warn('processCardsForWatchHistory function not found on window');
+  }
+
   // --- Set up or update sentinel for Intersection Observer ---
   setupIntersectionObserver(actualVideos.length);
   // --- End Sentinel Setup ---
@@ -452,6 +390,12 @@ function createSubscriptionVideoCard(video) {
         <div class="video-thumbnail relative">
             <img src="${video.thumbnailUrl || '/img/default-video.png'}" alt="${video.title || 'Video thumbnail'}" loading="lazy" class="w-full h-full object-cover aspect-video">
             <!-- No duration available -->
+            <!-- Watch History Overlay -->
+            <div class="watch-history-overlay absolute inset-0 bg-black/60 hidden group-hover:opacity-0 transition-opacity duration-200"></div>
+            <!-- Watch History Progress Bar -->
+            <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden">
+                <div class="watch-history-progress-bar h-full bg-red-700"></div>
+            </div>
              <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
                  <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
@@ -479,12 +423,6 @@ function createSubscriptionVideoCard(video) {
             </div>
         </div>
     `;
-
-  // Apply watch indicator immediately if history is already loaded
-  // Note: This might not work reliably here as durationSeconds is missing from feed
-  if (window.watchHistoryLoaded) {
-    updateWatchIndicator(card);
-  }
 
   // --- Add Listeners for Hover Icons (Copied from app.js) ---
   const bookmarkBtn = card.querySelector('.bookmark-btn');
