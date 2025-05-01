@@ -16,6 +16,8 @@ const videoPlayerAddToPlaylistBtn = document.getElementById('addToPlaylistBtnPla
 // Global variables / State (App Level)
 let currentVideoId = null;
 let currentVideoDetailsForPlaylist = {}; // Store details needed for adding to playlist
+window.watchHistoryProgress = new Map(); // Map videoId -> { watchedSeconds, durationSeconds }
+window.watchHistoryLoaded = false;
 
 // === Helper to Update Bookmark Icon State ===
 function updateBookmarkIconState(cardElement) {
@@ -41,6 +43,79 @@ function updateBookmarkIconState(cardElement) {
       bookmarkBtn.title = "Add to Watch Later";
       bookmarkBtn.classList.remove('visible');
     }
+  }
+}
+
+// === Helper to Update Watch Indicator State ===
+function updateWatchIndicator(cardElement) {
+  const videoId = cardElement.dataset.videoId;
+  const thumbnailDiv = cardElement.querySelector('.video-thumbnail');
+
+  if (!thumbnailDiv || !videoId) return;
+
+  // Remove existing indicators first
+  thumbnailDiv.querySelector('.watched-overlay')?.remove();
+  thumbnailDiv.querySelector('.watched-progress-bar')?.remove();
+
+  if (window.watchHistoryProgress.has(videoId)) {
+    const historyData = window.watchHistoryProgress.get(videoId);
+    const watchedSeconds = historyData.watchedSeconds || 0;
+    // Get duration from the card dataset if available, otherwise from history data
+    const durationSeconds = parseFloat(cardElement.dataset.durationSeconds) || historyData.durationSeconds || 0;
+
+    if (durationSeconds > 0 && watchedSeconds > 0) {
+      // Add Overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'watched-overlay';
+      thumbnailDiv.appendChild(overlay);
+
+      // Add Progress Bar
+      const progressBarContainer = document.createElement('div');
+      progressBarContainer.className = 'watched-progress-bar';
+      const progressBarInner = document.createElement('div');
+      progressBarInner.className = 'watched-progress-bar-inner';
+
+      // Calculate progress, ensuring it's between 0 and 100
+      let progressPercent = (watchedSeconds / durationSeconds) * 100;
+      progressPercent = Math.min(100, Math.max(0, progressPercent));
+      // Consider a video fully watched if > 95% watched
+      if (progressPercent > 95) progressPercent = 100;
+
+      progressBarInner.style.width = `${progressPercent}%`;
+
+      progressBarContainer.appendChild(progressBarInner);
+      thumbnailDiv.appendChild(progressBarContainer);
+    }
+  }
+}
+
+// === Fetch Watch History ===
+async function loadWatchHistoryProgress() {
+  try {
+    // Fetch a decent number of recent history entries
+    const response = await fetch('/api/watch-history?limit=500');
+    if (!response.ok) {
+      console.warn(`Failed to fetch watch history: ${response.status}`);
+      return; // Don't block further execution
+    }
+    const historyEntries = await response.json();
+    window.watchHistoryProgress.clear(); // Clear previous entries if any
+    historyEntries.forEach(entry => {
+      if (entry.video_id && typeof entry.watched_seconds === 'number' && typeof entry.duration_seconds === 'number') {
+        window.watchHistoryProgress.set(entry.video_id, {
+          watchedSeconds: entry.watched_seconds,
+          durationSeconds: entry.duration_seconds
+        });
+      }
+    });
+    console.log(`[Watch History] Loaded ${window.watchHistoryProgress.size} progress entries.`);
+  } catch (error) {
+    console.error('[Watch History] Error fetching progress:', error);
+  } finally {
+    window.watchHistoryLoaded = true;
+    // Dispatch event AFTER setting the flag
+    document.dispatchEvent(new CustomEvent('watchHistoryLoaded'));
+    console.log("[Watch History] Dispatched watchHistoryLoaded event.");
   }
 }
 
@@ -378,6 +453,10 @@ function displayResults(results, mainContentElement) {
 
   // Append the new grid container to the main content element
   mainContentElement.appendChild(gridContainer);
+
+  // Update indicators after displaying results
+  document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
+  document.dispatchEvent(new Event('uiNeedsWatchUpdate')); // Dispatch watch update event
 }
 
 function createVideoCard(video) {
@@ -387,15 +466,17 @@ function createVideoCard(video) {
   const thumbnail = video.thumbnails?.[0]?.url || '/img/default-video.png';
   let duration = video.duration || '';
   let views = video.viewCount || '';
-  let uploadedAt = video.uploadedAt || '';
+  let uploadedAt = video.uploadedAt || 'Unknown date';
   const videoTitle = video.title || 'Untitled';
   const channelNameText = video.channel?.name || 'Unknown';
+  const durationSeconds = video.durationSeconds || 0; // Store duration in seconds
 
   card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
   card.dataset.videoTitle = videoTitle;
   card.dataset.channelName = channelNameText;
   card.dataset.thumbnailUrl = thumbnail;
+  card.dataset.durationSeconds = durationSeconds; // Add duration to dataset
 
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
 
@@ -464,6 +545,11 @@ function createVideoCard(video) {
             <i class="fas fa-plus"></i>
         </button>
     `;
+
+  // Apply watch indicator immediately if history is already loaded
+  if (window.watchHistoryLoaded) {
+    updateWatchIndicator(card);
+  }
 
   // --- Add Listeners for Hover Icons ---
   const bookmarkBtn = card.querySelector('.bookmark-btn');
@@ -619,6 +705,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   // --- End Event Listener ---
+
+  // --- Event Listener for Updating Watch Indicators ---
+  const updateAllVisibleWatchIndicators = () => {
+    const cards = document.querySelectorAll('#main-content > main > #content > .video-card');
+    console.log(`[app.js] Found ${cards.length} video cards in #content to update watch status.`);
+    cards.forEach(card => {
+      if (card.dataset.videoId) {
+        updateWatchIndicator(card);
+      }
+    });
+  };
+
+  // Listen for watch history loaded event
+  document.addEventListener('watchHistoryLoaded', () => {
+    console.log("[app.js] Received watchHistoryLoaded event. Updating watch indicators in #content.");
+    updateAllVisibleWatchIndicators();
+  });
+
+  // Listen for a custom event that signals UI might need an update (e.g., after search results display)
+  document.addEventListener('uiNeedsWatchUpdate', () => {
+    console.log("[app.js] Received uiNeedsWatchUpdate event. Updating watch indicators.");
+    // This check ensures we don't try to update before the data is ready
+    if (window.watchHistoryLoaded) {
+      updateAllVisibleWatchIndicators();
+    } else {
+      console.log("[app.js] Watch history info not yet loaded, skipping immediate update.");
+      // The 'watchHistoryLoaded' listener will handle it later.
+    }
+  });
+
+  // Load watch history progress on startup
+  loadWatchHistoryProgress();
 });
 
 // === Subscribe/Unsubscribe Logic ===
