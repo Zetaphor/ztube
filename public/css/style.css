@@ -595,3 +595,9 @@ body {
   color: #22c55e;
   /* text-green-500 */
 }
+
+@media (min-width: 1277px) {
+  #videoAreaContainer {
+    height: 69vh;
+  }
+}
