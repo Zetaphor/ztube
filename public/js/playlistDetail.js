@@ -158,6 +158,13 @@ function createPlaylistVideoCard(video, index) {
             <div class="watch-history-progress absolute bottom-0 left-0 right-0 h-1 bg-red-600 hidden">
                 <div class="watch-history-progress-bar h-full bg-red-700"></div>
             </div>
+            <!-- Thumbnail Hover Icons -->
+            <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
+                <button class="remove-history-btn thumbnail-icon-btn hidden" title="Remove from History">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+                <!-- Add other icons like playlist/bookmark if needed later -->
+            </div>
         </div>
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-1 text-sm h-10 cursor-pointer hover:text-green-400" title="${escapeHtml(video.title)}" onclick="window.loadAndDisplayVideo('${video.video_id}', this.closest('.video-card'))">${escapeHtml(video.title) || 'Untitled'}</h3>

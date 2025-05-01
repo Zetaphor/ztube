@@ -457,6 +457,9 @@ function createVideoCard(video) {
             </div>
             <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
+                <button class="remove-history-btn thumbnail-icon-btn hidden" title="Remove from History">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
                     <i class="fas fa-plus"></i>
                 </button>
@@ -738,8 +741,18 @@ function updateWatchHistoryUI(cardElement, historyData) {
   const overlay = cardElement.querySelector('.watch-history-overlay');
   const progressContainer = cardElement.querySelector('.watch-history-progress');
   const progressBar = cardElement.querySelector('.watch-history-progress-bar');
+  const removeHistoryBtn = cardElement.querySelector('.remove-history-btn'); // Find the new button
 
-  if (!overlay || !progressContainer || !progressBar) {
+  // --- Remove existing listener to prevent duplicates ---
+  // Clone the button and replace it to remove all old listeners safely
+  let newRemoveHistoryBtn = removeHistoryBtn;
+  if (removeHistoryBtn) {
+    newRemoveHistoryBtn = removeHistoryBtn.cloneNode(true);
+    removeHistoryBtn.parentNode.replaceChild(newRemoveHistoryBtn, removeHistoryBtn);
+  }
+  // --- End Listener Removal ---
+
+  if (!overlay || !progressContainer || !progressBar || !newRemoveHistoryBtn) {
     // console.warn('Watch history UI elements not found in card:', cardElement);
     return;
   }
@@ -747,6 +760,47 @@ function updateWatchHistoryUI(cardElement, historyData) {
   if (historyData && historyData.watchedSeconds > 0) {
     overlay.classList.remove('hidden');
     progressContainer.classList.remove('hidden');
+    newRemoveHistoryBtn.classList.remove('hidden'); // Show the button
+
+    // Attach click listener ONLY when shown
+    newRemoveHistoryBtn.addEventListener('click', async (e) => {
+      e.stopPropagation(); // Prevent card click
+      const videoId = cardElement.dataset.videoId;
+      if (!videoId) return;
+
+      // Optional: Add a visual loading state to the button
+      newRemoveHistoryBtn.disabled = true;
+      const icon = newRemoveHistoryBtn.querySelector('i');
+      const originalIconClass = icon ? icon.className : '';
+      if (icon) icon.className = 'fas fa-spinner fa-spin';
+
+      try {
+        const response = await fetch(`/api/watch-history/${videoId}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `API Error: ${response.status}`);
+        }
+
+        console.log(`Removed video ${videoId} from watch history.`);
+        // Update UI immediately on success
+        overlay.classList.add('hidden');
+        progressContainer.classList.add('hidden');
+        progressBar.style.width = '0%';
+        newRemoveHistoryBtn.classList.add('hidden'); // Hide the button again
+        // Update cache
+        knownHistoryStatus[videoId] = null;
+
+      } catch (error) {
+        console.error(`Failed to remove ${videoId} from history:`, error);
+        showError(`Error removing from history: ${error.message}`);
+        // Restore button state on error
+        newRemoveHistoryBtn.disabled = false;
+        if (icon) icon.className = originalIconClass;
+      }
+    });
 
     const duration = historyData.durationSeconds;
     const watched = historyData.watchedSeconds;
@@ -770,6 +824,14 @@ function updateWatchHistoryUI(cardElement, historyData) {
     progressContainer.classList.add('hidden');
     progressBar.style.width = '0%';
   }
+
+  // --- Restore button state (e.g., re-enable if it was disabled) ---
+  if (newRemoveHistoryBtn) newRemoveHistoryBtn.disabled = false; // Ensure it's enabled if no listener was added or on error recovery
+  const icon = newRemoveHistoryBtn?.querySelector('i');
+  if (icon && icon.classList.contains('fa-spinner')) {
+    icon.className = 'fas fa-trash-alt'; // Restore original icon if stuck loading
+  }
+  // --- End Restore Button State ---
 }
 
 /**
