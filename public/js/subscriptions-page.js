@@ -102,6 +102,16 @@ document.addEventListener('DOMContentLoaded', () => {
           // Cache is valid and not expired
           console.info(`Loaded ${cachedItem.data.length} videos from valid cache.`);
           allFetchedVideos = cachedItem.data; // Store cached videos
+
+          // ---> Clear app.js cache for these specific IDs before processing <---
+          const cachedVideoIds = allFetchedVideos.map(v => v.id).filter(Boolean);
+          if (window.clearWatchHistoryCacheForIds) {
+            window.clearWatchHistoryCacheForIds(cachedVideoIds);
+          } else {
+            console.warn('clearWatchHistoryCacheForIds function not found on window');
+          }
+          // ---> End Cache Clearing <---
+
           currentVideoIndex = 0; // Reset index
           displaySubscriptionVideos(); // Start display process
           shouldFetch = false; // Don't fetch immediately if valid cache is loaded

@@ -928,10 +928,29 @@ function processCardsForWatchHistory(cards) {
   }
 }
 
+/**
+ * Removes specified video IDs from the in-memory watch history cache.
+ * @param {string[]} videoIds - Array of video IDs to clear from the cache.
+ */
+function clearWatchHistoryCacheForIds(videoIds) {
+  if (!videoIds || videoIds.length === 0) return;
+  let clearedCount = 0;
+  videoIds.forEach(id => {
+    if (knownHistoryStatus.hasOwnProperty(id)) {
+      delete knownHistoryStatus[id];
+      clearedCount++;
+    }
+  });
+  if (clearedCount > 0) {
+    console.log(`[App.js] Cleared ${clearedCount} IDs from watch history cache.`);
+  }
+}
+
 // --- End Watch History Update Functions ---
 
 // Expose for use by other modules (like subscriptions-page.js)
 window.processCardsForWatchHistory = processCardsForWatchHistory;
+window.clearWatchHistoryCacheForIds = clearWatchHistoryCacheForIds; // Expose the new function
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
