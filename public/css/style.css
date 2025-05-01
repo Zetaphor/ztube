@@ -414,27 +414,12 @@ button:focus {
   /* Center the marker on the percentage */
 }
 
-/* Sidebar Styles */
-#sidebar {
-  /* Tailwind classes handle most of this (w-16, bg-zinc-800, fixed, etc.) */
-  /* Add specific scrollbar styling if needed, similar to #commentsList */
-}
-
 #main-content {
   /* Tailwind class ml-16 handles the margin */
   /* Ensure vertical scrolling if content exceeds viewport */
   height: 100vh;
   /* Take full viewport height */
   overflow-y: auto;
-}
-
-/* Adjust main container padding to account for sticky nav within #main-content */
-#main-content>main {
-  /* The sticky nav has a height (p-4 -> 1rem padding, text-2xl line height ~2rem). */
-  /* Let's calculate total nav height roughly: 1rem + 1rem + ~2rem = ~4rem (64px) */
-  /* It's safer to inspect the actual rendered height, but this is a start */
-  /* padding-top: 4rem; /* Example: Adjust based on nav height - Tailwind's sticky handles this */
-  /* Removed pt-20 from index.ejs, manage padding here if needed */
 }
 
 /* Add styles for Quality Controls */
@@ -447,18 +432,6 @@ button:focus {
 body {
   overflow: hidden;
   /* Prevent scrolling on the body */
-}
-
-/* New Theater Mode Styles (Non-Overlay) */
-/* When theater mode is active on the #videoPlayer container */
-#videoPlayer.theater-mode-active #mainPlayerContent {
-  /* Already handled by JS adding md:w-full, but could add !important if needed */
-  /* width: 100% !important; */
-}
-
-#videoPlayer.theater-mode-active #recommendedVideos {
-  /* Already handled by JS adding hidden */
-  /* display: none !important; */
 }
 
 /* Ensure player can grow */
