@@ -380,6 +380,7 @@ function createSubscriptionVideoCard(video) {
 
   // Basic channel link using channelId
   const channelLink = `/channel/${video.channelId}`;
+  const channelAvatarUrl = video.channelAvatar || '/img/default-avatar.svg';
 
   // --- Build meta HTML string (matching app.js structure) ---
   let metaHTML = '';
@@ -423,12 +424,16 @@ function createSubscriptionVideoCard(video) {
         <div class="p-3">
             <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10" title="${video.title || 'Untitled'}">${video.title || 'Untitled'}</h3>
             <div class="flex items-center mt-1">
-                <!-- No avatar available, just link the name -->
+                <a href="${channelLink}" class="flex-shrink-0 mr-2" onclick="event.stopPropagation();">
+                    <img src="${channelAvatarUrl}" alt="${video.channelName || 'Unknown Channel'} avatar" class="w-8 h-8 rounded-full">
+                </a>
                 <div class="flex-1 min-w-0">
-                    <a href="${channelLink}" class="hover:text-green-500 truncate text-zinc-300 text-xs" onclick="event.stopPropagation();" title="${video.channelName || 'Unknown Channel'}">
-                      ${video.channelName || 'Unknown Channel'}
-                      <!-- No verified badge available -->
-                    </a>
+                    <div class="flex items-center text-zinc-300 text-xs">
+                        <a href="${channelLink}" class="hover:text-green-500 truncate" onclick="event.stopPropagation();" title="${video.channelName || 'Unknown Channel'}">
+                          ${video.channelName || 'Unknown Channel'}
+                          <!-- No verified badge available -->
+                        </a>
+                    </div>
                     <div class="video-meta text-zinc-400 text-xs mt-0.5 flex flex-wrap gap-x-1">
                          ${metaHTML}
                     </div>

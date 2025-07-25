@@ -61,6 +61,11 @@ router.get('/:id', async (req, res) => {
       chapters = []; // Ensure chapters is empty on error
     }
 
+    console.log("[DEBUG] video.basic_info.channel:", video.basic_info.channel);
+    console.log("[DEBUG] video.basic_info.channel.thumbnails:", video.basic_info.channel?.thumbnails);
+    console.log("[DEBUG] video.secondary_info.owner:", video.secondary_info?.owner);
+    console.log("[DEBUG] video.secondary_info.owner.author:", video.secondary_info?.owner?.author);
+
     const videoDetails = {
       id: video.basic_info.id,
       title: video.basic_info.title?.text || video.basic_info.title,

@@ -20,6 +20,7 @@ function createRecommendedVideoCard(video) {
   let uploadedAt = video.uploadedAt || '';
   const channelNameText = video.channel?.name || 'Unknown';
   const channelId = video.channel?.id;
+  const channelAvatarUrl = video.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
   const videoTitle = video.title || 'Untitled'; // Store title
 
   // Add video data to dataset for easy access
@@ -73,8 +74,11 @@ function createRecommendedVideoCard(video) {
       </div>
       <div class="recommended-details flex flex-col justify-start overflow-hidden">
         <h4 class="recommended-title text-sm font-medium text-zinc-100 line-clamp-2 mb-1">${videoTitle}</h4>
-        <div class="recommended-channel text-xs text-zinc-400 truncate mb-0.5">
-          ${channelId ? `<a href="/channel/${channelId}" class="hover:text-green-500" onclick="event.stopPropagation();">${channelNameText}</a>` : `<span>${channelNameText}</span>`}
+        <div class="recommended-channel flex items-center text-xs text-zinc-400 truncate mb-0.5">
+          <a href="${channelId ? `/channel/${channelId}` : '#'}" class="flex-shrink-0 mr-1.5" onclick="event.stopPropagation();">
+            <img src="${channelAvatarUrl}" alt="${channelNameText} avatar" class="w-5 h-5 rounded-full">
+          </a>
+          ${channelId ? `<a href="/channel/${channelId}" class="hover:text-green-500 truncate" onclick="event.stopPropagation();">${channelNameText}</a>` : `<span class="truncate">${channelNameText}</span>`}
         </div>
         <div class="recommended-meta text-xs text-zinc-400 flex flex-wrap gap-x-1.5">
           ${views ? `<span>${views}</span>` : ''}

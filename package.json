@@ -52,6 +52,8 @@
     ],
     "asarUnpack": [
       "**/src/**",
+      "**/views/**",
+      "**/public/**",
       "**/node_modules/**"
     ],
     "directories": {

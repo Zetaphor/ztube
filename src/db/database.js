@@ -2,15 +2,52 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import os from 'os';
 
-// Determine the project root directory
+// Determine the project root directory (for development)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Go up two levels from src/db to the project root
 const projectRoot = path.resolve(__dirname, '../../');
 
-// TODO: In a packaged Electron app, use app.getPath('userData') for storing the DB
-const dbPath = path.join(projectRoot, 'ztube.db');
+// Use ~/.config/ztube for database and configuration in production
+// Fall back to project root for development if ~/.config/ztube is not writable
+const configDir = path.join(os.homedir(), '.config', 'ztube');
+let dbPath;
+
+try {
+  // Ensure the config directory exists
+  fs.mkdirSync(configDir, { recursive: true });
+
+  // Test if we can write to the config directory
+  const testFile = path.join(configDir, '.write-test');
+  fs.writeFileSync(testFile, 'test');
+  fs.unlinkSync(testFile);
+
+  // If we get here, the config directory is writable
+  dbPath = path.join(configDir, 'ztube.db');
+  console.log(`Using config directory: ${configDir}`);
+
+  // Migration: Check if there's an existing database in the project root
+  const oldDbPath = path.join(projectRoot, 'ztube.db');
+  if (fs.existsSync(oldDbPath) && !fs.existsSync(dbPath)) {
+    console.log('Migrating existing database from project root to config directory...');
+    try {
+      fs.copyFileSync(oldDbPath, dbPath);
+      console.log(`✓ Database migrated to: ${dbPath}`);
+      console.log(`Note: Old database file still exists at: ${oldDbPath}`);
+      console.log('You can safely delete the old database file once you verify the migration was successful.');
+    } catch (migrationError) {
+      console.error('Failed to migrate database:', migrationError.message);
+      console.log('Continuing with new database in config directory...');
+    }
+  }
+} catch (error) {
+  // Fall back to project root for development
+  console.warn(`Cannot write to config directory (${configDir}), falling back to project root:`, error.message);
+  dbPath = path.join(projectRoot, 'ztube.db');
+}
+
 const dbExists = fs.existsSync(dbPath);
 
 console.log(`Database path: ${dbPath}`);

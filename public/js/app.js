@@ -53,7 +53,7 @@ function updateBookmarkIconState(cardElement) {
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
-window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
+window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, skipHistory = false) {
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
   const mainContentContainer = document.querySelector('#main-content > main'); // The <main> element in all pages
 
@@ -70,6 +70,21 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
   try {
     showLoading();
     currentVideoId = videoId;
+
+    // Create a history entry for the video if URL doesn't already include it and skipHistory is false
+    if (!skipHistory) {
+      const currentUrl = new URL(window.location);
+      if (!currentUrl.searchParams.get('v') || currentUrl.searchParams.get('v') !== videoId) {
+        // Store current state before changing to video
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('v', videoId);
+        window.history.pushState({
+          type: 'video',
+          videoId: videoId,
+          previousUrl: window.location.href
+        }, '', newUrl.toString());
+      }
+    }
 
     // Hide the main content container
     mainContentContainer.classList.add('hidden');
@@ -118,12 +133,18 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
     const channelAvatar = document.getElementById('channelAvatar');
     const channelIdForLink = videoDetails.author?.id;
 
+    console.log("[DEBUG] Video details author:", videoDetails.author);
+    console.log("[DEBUG] Author thumbnails:", videoDetails.author?.thumbnails);
+    console.log("[DEBUG] First author thumbnail:", videoDetails.author?.thumbnails?.[0]);
+
     if (channelAvatarLink && channelIdForLink) {
       channelAvatarLink.href = `/channel/${channelIdForLink}`;
     }
 
     if (channelAvatar) {
-      channelAvatar.src = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
+      const avatarUrl = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
+      console.log("[DEBUG] Setting channel avatar to:", avatarUrl);
+      channelAvatar.src = avatarUrl;
     }
 
     // Add Hover Effect Listeners (Remains in app.js)
@@ -568,7 +589,7 @@ async function playVideo(videoId, videoCardElement) {
 }
 
 // App-level function to handle closing the player
-function closeVideoPlayer() {
+function closeVideoPlayer(skipHistory = false) {
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
   const mainContentContainer = document.querySelector('#main-content > main'); // The <main> element in all pages
 
@@ -585,6 +606,15 @@ function closeVideoPlayer() {
     console.error(`closeVideoPlayer: Could not find the main content container (#main-content > main) to show!`);
   }
 
+  // Remove video parameter from URL and update history (only if not skipping history)
+  if (!skipHistory) {
+    const currentUrl = new URL(window.location);
+    if (currentUrl.searchParams.has('v')) {
+      currentUrl.searchParams.delete('v');
+      window.history.pushState({ type: 'main' }, '', currentUrl.toString());
+    }
+  }
+
   // Clear app-specific state related to the video
   currentVideoId = null;
   currentVideoDetailsForPlaylist = {}; // Clear playlist details too
@@ -595,13 +625,66 @@ function closeVideoPlayer() {
   Recommended.clearRecommendedVideos();
 }
 
+// Global keyboard shortcut handler for browser navigation
+document.addEventListener('keydown', (event) => {
+  // Handle Alt+Left/Right for browser history navigation
+  if (event.altKey && !event.ctrlKey && !event.shiftKey && !event.metaKey) {
+    // Ignore if user is typing in an input field
+    if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'ArrowLeft': // Alt+Left = Go back in history
+        event.preventDefault();
+        if (window.history.length > 1) {
+          window.history.back();
+        }
+        break;
+      case 'ArrowRight': // Alt+Right = Go forward in history
+        event.preventDefault();
+        if (window.history.length > 1) {
+          window.history.forward();
+        }
+        break;
+    }
+  }
+});
+
+// Handle browser back/forward navigation
+window.addEventListener('popstate', (event) => {
+  const currentUrl = new URL(window.location);
+  const videoId = currentUrl.searchParams.get('v');
+
+  const videoPlayerContainer = document.getElementById('videoPlayer');
+  const mainContentContainer = document.querySelector('#main-content > main');
+
+  if (videoId) {
+    // User navigated to a video URL
+    if (videoPlayerContainer && videoPlayerContainer.classList.contains('hidden')) {
+      // Video player is hidden, load the video (skip history since this is from popstate)
+      window.loadAndDisplayVideo(videoId, null, true);
+    }
+  } else {
+    // User navigated away from video URL
+    if (videoPlayerContainer && !videoPlayerContainer.classList.contains('hidden')) {
+      // Video player is visible, close it without pushing new history
+      closeVideoPlayer(true);
+    }
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const queryParam = urlParams.get('query');
+  const videoParam = urlParams.get('v');
   const searchInput = document.getElementById('searchInput');
   const content = document.getElementById('content');
 
-  if (queryParam && searchInput && content) {
+  // Check if we need to load a video from URL parameter
+  if (videoParam) {
+    window.loadAndDisplayVideo(videoParam, null, true);
+  } else if (queryParam && searchInput && content) {
     searchInput.value = queryParam;
     performSearch();
   } else {
