@@ -449,6 +449,17 @@ function createSubscriptionVideoCard(video) {
   card.dataset.thumbnailUrl = video.thumbnailUrl || '/img/default-video.png';
 
   if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
+    // Set initial icon state and visibility
+    if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) {
+      bookmarkIcon.className = 'fas fa-bookmark'; // Solid bookmark
+      bookmarkBtn.title = "Remove from Watch Later";
+      bookmarkBtn.classList.add('visible'); // Make visible
+    } else {
+      bookmarkIcon.className = 'far fa-bookmark'; // Ensure default classes
+      bookmarkBtn.title = "Add to Watch Later";
+      bookmarkBtn.classList.remove('visible'); // Ensure hidden
+    }
+
     bookmarkBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const currentIconClass = bookmarkIcon.className;

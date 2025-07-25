@@ -125,7 +125,7 @@ function createWindow() {
   // Wait a bit for the server to start before loading the app
   setTimeout(() => {
     // Load the app from the local server
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL('http://localhost:4420');
 
     // Open DevTools automatically in development mode
     if (isDev) {

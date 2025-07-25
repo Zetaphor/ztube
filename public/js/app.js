@@ -216,9 +216,13 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
         if (initiallyInDefault) {
           initialIcon.className = 'fas fa-bookmark';
           videoPlayerToggleWatchLaterBtn.title = "Remove from Watch Later";
+          videoPlayerToggleWatchLaterBtn.classList.remove('bg-zinc-600');
+          videoPlayerToggleWatchLaterBtn.classList.add('bg-green-600');
         } else {
           initialIcon.className = 'far fa-bookmark';
           videoPlayerToggleWatchLaterBtn.title = "Add to Watch Later";
+          videoPlayerToggleWatchLaterBtn.classList.remove('bg-green-600');
+          videoPlayerToggleWatchLaterBtn.classList.add('bg-zinc-600');
         }
       }
 
@@ -244,9 +248,13 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null) {
           if (isNowInPlaylist) {
             iconElement.className = 'fas fa-bookmark';
             newWatchLaterButton.title = "Remove from Watch Later";
+            newWatchLaterButton.classList.remove('bg-zinc-600');
+            newWatchLaterButton.classList.add('bg-green-600');
           } else {
             iconElement.className = 'far fa-bookmark';
             newWatchLaterButton.title = "Add to Watch Later";
+            newWatchLaterButton.classList.remove('bg-green-600');
+            newWatchLaterButton.classList.add('bg-zinc-600');
           }
           newWatchLaterButton.disabled = false; // Re-enable on success
         } catch (error) {
@@ -497,8 +505,16 @@ function createVideoCard(video) {
   const bookmarkIcon = bookmarkBtn?.querySelector('i');
 
   if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
-    // Remove initial state setting here
-    // if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) { ... }
+    // Set initial icon state and visibility
+    if (window.isVideoInDefaultPlaylist && window.isVideoInDefaultPlaylist(card.dataset.videoId)) {
+      bookmarkIcon.className = 'fas fa-bookmark'; // Solid bookmark
+      bookmarkBtn.title = "Remove from Watch Later";
+      bookmarkBtn.classList.add('visible'); // Make visible
+    } else {
+      bookmarkIcon.className = 'far fa-bookmark'; // Ensure default classes
+      bookmarkBtn.title = "Add to Watch Later";
+      bookmarkBtn.classList.remove('visible'); // Ensure hidden
+    }
 
     bookmarkBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
