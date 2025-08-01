@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { Readable } from 'stream';
 import * as PlaylistsRepo from '../db/playlistsRepository.js';
+import { generateUniquePlaylistName } from '../db/playlistsRepository.js';
 
 const router = express.Router();
 
@@ -244,39 +245,40 @@ router.post('/import', upload.single('playlistsFile'), async (req, res) => {
           }
         } catch (playlistError) {
           if (playlistError.message?.includes('UNIQUE constraint failed')) {
-            console.info(`Playlist "${playlistName}" already exists, adding videos to existing playlist`);
+            console.info(`Playlist "${playlistName}" already exists, creating with unique name`);
             try {
-              // Get existing playlist
-              const existingPlaylists = await PlaylistsRepo.getAllPlaylists();
-              const existingPlaylist = existingPlaylists.find(p => p.name === playlistName);
+              // Generate a unique name and create new playlist
+              const uniqueName = await generateUniquePlaylistName(playlistName);
+              console.info(`Creating playlist with unique name: "${uniqueName}"`);
 
-              if (existingPlaylist) {
-                // Add videos to existing playlist
-                for (const video of videos) {
-                  try {
-                    const videoId = video.videoId;
-                    const title = video.title || 'Unknown Title';
-                    const channelName = video.author || 'Unknown Channel';
-                    const thumbnailUrl = video.thumbnailUrl || null;
+              const playlistId = await PlaylistsRepo.createPlaylist(uniqueName, description);
+              importedPlaylists++;
 
-                    if (videoId && title) {
-                      await PlaylistsRepo.addVideoToPlaylist(
-                        existingPlaylist.id,
-                        videoId,
-                        title,
-                        channelName,
-                        thumbnailUrl
-                      );
-                      importedVideos++;
-                    }
-                  } catch (videoError) {
-                    console.error(`Error adding video to existing playlist ${playlistName}:`, videoError.message);
-                    // Continue with other videos
+              // Add videos to the new playlist
+              for (const video of videos) {
+                try {
+                  const videoId = video.videoId;
+                  const title = video.title || 'Unknown Title';
+                  const channelName = video.author || 'Unknown Channel';
+                  const thumbnailUrl = video.thumbnailUrl || null;
+
+                  if (videoId && title) {
+                    await PlaylistsRepo.addVideoToPlaylist(
+                      playlistId,
+                      videoId,
+                      title,
+                      channelName,
+                      thumbnailUrl
+                    );
+                    importedVideos++;
                   }
+                } catch (videoError) {
+                  console.error(`Error adding video to playlist ${uniqueName}:`, videoError.message);
+                  // Continue with other videos
                 }
               }
-            } catch (existingError) {
-              errors.push(`Failed to add videos to existing playlist "${playlistName}": ${existingError.message}`);
+            } catch (uniqueError) {
+              errors.push(`Failed to create playlist with unique name for "${playlistName}": ${uniqueError.message}`);
             }
           } else {
             errors.push(`Failed to create playlist "${playlistName}": ${playlistError.message}`);

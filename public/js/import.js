@@ -34,7 +34,7 @@ function showSuccess(message) {
   setTimeout(() => successDiv.remove(), 5000);
 }
 
-// Generic file import handler
+// Generic file import handler with real upload progress
 async function handleFileImport(config) {
   const {
     file,
@@ -47,7 +47,8 @@ async function handleFileImport(config) {
     selectBtn,
     fileDisplayElement,
     fileInput,
-    successMessage
+    successMessage,
+    queryParams = {} // Support for query parameters
   } = config;
 
   if (!file) {
@@ -62,48 +63,117 @@ async function handleFileImport(config) {
   progressBar.style.width = '0%';
   progressText.textContent = 'Uploading...';
 
-  try {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append(fieldName, file);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      body: formData
+    // Build URL with query parameters
+    const url = new URL(endpoint, window.location.origin);
+    Object.entries(queryParams).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.append(key, value);
+      }
     });
 
-    progressBar.style.width = '100%';
-    progressText.textContent = 'Processing...';
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = (event.loaded / event.total) * 100;
+        progressBar.style.width = `${percentComplete}%`;
+        progressText.textContent = `Uploading... ${Math.round(percentComplete)}%`;
+      }
+    });
 
-    const result = await response.json();
+    // Handle upload completion
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Processing...';
 
-    if (response.ok) {
-      // Success
-      progressText.textContent = 'Import completed successfully!';
+        try {
+          const result = JSON.parse(xhr.responseText);
+
+          // Success
+          progressText.textContent = 'Import completed successfully!';
+          setTimeout(() => {
+            progressElement.classList.add('hidden');
+            // Reset form
+            fileInput.value = '';
+            fileDisplayElement.textContent = '';
+            uploadBtn.disabled = true;
+            selectBtn.disabled = false;
+          }, 2000);
+
+          showSuccess(result.message || successMessage);
+          resolve(result);
+        } catch (parseError) {
+          const errorMsg = 'Failed to parse server response';
+          progressText.textContent = 'Import failed';
+          showError(`Import failed: ${errorMsg}`);
+          reject(new Error(errorMsg));
+        }
+      } else {
+        try {
+          const result = JSON.parse(xhr.responseText);
+          const errorMsg = result.error || `Server returned status ${xhr.status}`;
+          progressText.textContent = 'Import failed';
+          showError(`Import failed: ${errorMsg}`);
+          reject(new Error(errorMsg));
+        } catch (parseError) {
+          const errorMsg = `Server returned status ${xhr.status}`;
+          progressText.textContent = 'Import failed';
+          showError(`Import failed: ${errorMsg}`);
+          reject(new Error(errorMsg));
+        }
+      }
+
+      // Hide progress after delay
       setTimeout(() => {
         progressElement.classList.add('hidden');
-        // Reset form
-        fileInput.value = '';
-        fileDisplayElement.textContent = '';
-        uploadBtn.disabled = true;
+        uploadBtn.disabled = false;
         selectBtn.disabled = false;
-      }, 2000);
+        progressBar.style.width = '0%';
+      }, 3000);
+    });
 
-      showSuccess(result.message || successMessage);
-    } else {
-      throw new Error(result.error || 'Import failed');
-    }
-  } catch (error) {
-    console.error('Error importing data:', error);
-    progressText.textContent = 'Import failed';
-    showError(`Import failed: ${error.message}`);
-  } finally {
-    setTimeout(() => {
-      progressElement.classList.add('hidden');
-      uploadBtn.disabled = false;
-      selectBtn.disabled = false;
-      progressBar.style.width = '0%';
-    }, 3000);
-  }
+    // Handle upload errors
+    xhr.addEventListener('error', () => {
+      const errorMsg = 'Network error occurred during upload';
+      console.error('Upload error:', errorMsg);
+      progressText.textContent = 'Upload failed';
+      showError(`Upload failed: ${errorMsg}`);
+
+      setTimeout(() => {
+        progressElement.classList.add('hidden');
+        uploadBtn.disabled = false;
+        selectBtn.disabled = false;
+        progressBar.style.width = '0%';
+      }, 3000);
+
+      reject(new Error(errorMsg));
+    });
+
+    // Handle upload abort
+    xhr.addEventListener('abort', () => {
+      const errorMsg = 'Upload was cancelled';
+      progressText.textContent = 'Upload cancelled';
+      showError(errorMsg);
+
+      setTimeout(() => {
+        progressElement.classList.add('hidden');
+        uploadBtn.disabled = false;
+        selectBtn.disabled = false;
+        progressBar.style.width = '0%';
+      }, 3000);
+
+      reject(new Error(errorMsg));
+    });
+
+    // Start the upload
+    xhr.open('POST', url.toString());
+    xhr.send(formData);
+  });
 }
 
 // Subscriptions Import Functionality
@@ -125,6 +195,8 @@ function setupSubscriptionsImport() {
 
   uploadSubscriptionsBtn.addEventListener('click', async () => {
     const file = subscriptionsFileInput.files[0];
+    const skipAvatars = document.getElementById('skipAvatarsCheckbox').checked;
+
     await handleFileImport({
       file,
       endpoint: '/api/subscriptions/import',
@@ -136,7 +208,8 @@ function setupSubscriptionsImport() {
       selectBtn: selectSubscriptionsFileBtn,
       fileDisplayElement: selectedSubscriptionsFile,
       fileInput: subscriptionsFileInput,
-      successMessage: 'Subscriptions imported successfully!'
+      successMessage: 'Subscriptions imported successfully!',
+      queryParams: { skipAvatars: skipAvatars.toString() }
     });
   });
 }

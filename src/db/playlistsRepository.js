@@ -1,6 +1,27 @@
 import db from './database.js';
 
 /**
+ * Generates a unique playlist name by appending "Copy of" and potentially a number if needed.
+ * @param {string} baseName - The original playlist name
+ * @returns {Promise<string>} - A unique playlist name
+ */
+export const generateUniquePlaylistName = async (baseName) => {
+  const allPlaylists = await getAllPlaylists();
+  const existingNames = new Set(allPlaylists.map(p => p.name.toLowerCase()));
+
+  let candidateName = `Copy of ${baseName}`;
+  let counter = 1;
+
+  // If the candidate name already exists, keep adding numbers
+  while (existingNames.has(candidateName.toLowerCase())) {
+    candidateName = `Copy ${counter} of ${baseName}`;
+    counter++;
+  }
+
+  return candidateName;
+};
+
+/**
  * Creates a new playlist.
  * @param {string} name
  * @param {string} [description]

@@ -142,10 +142,12 @@ function displayHistory(historyEntries, reset = false) {
 
 // Function to play a video (integrate with existing video player)
 function playVideo(videoId, startTime = 0) {
-  // This should integrate with the existing video player functionality
-  // For now, we'll construct a URL similar to how the app handles video watching
-  const videoUrl = `/api/video/${videoId}`;
-  window.location.href = videoUrl;
+  // Use the global loadAndDisplayVideo function to play the video in the current page
+  if (typeof window.loadAndDisplayVideo === 'function') {
+    window.loadAndDisplayVideo(videoId, null, false);
+  } else {
+    console.error('loadAndDisplayVideo function not available');
+  }
 }
 
 // Function to resume a video from where it was left off

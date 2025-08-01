@@ -58,6 +58,12 @@
                   </button>
                 </div>
                 <div id="selectedSubscriptionsFile" class="text-zinc-400 text-sm min-h-[1.25rem]"></div>
+                <div class="flex items-center space-x-2 text-sm">
+                  <input type="checkbox" id="skipAvatarsCheckbox"
+                    class="rounded bg-zinc-700 border-zinc-600 text-blue-600">
+                  <label for="skipAvatarsCheckbox" class="text-zinc-400">Skip avatar fetching (faster import, reduces
+                    YouTube.js warnings)</label>
+                </div>
                 <button id="uploadSubscriptionsBtn" disabled
                   class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded transition duration-150">
                   <i class="fas fa-cloud-upload-alt mr-1"></i> Import Subscriptions

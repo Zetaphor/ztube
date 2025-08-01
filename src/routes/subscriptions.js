@@ -51,6 +51,7 @@ router.post('/', async (req, res) => {
 // API: Import Subscriptions from CSV
 router.post('/import', upload.single('subscriptionsCsv'), async (req, res) => {
   const youtube = await getYoutubeClient(); // Get client instance
+  const skipAvatars = req.query.skipAvatars === 'true'; // Option to skip avatar fetching
   if (!req.file) {
     return res.status(400).json({ error: 'No CSV file uploaded.' });
   }
@@ -98,28 +99,55 @@ router.post('/import', upload.single('subscriptionsCsv'), async (req, res) => {
         try {
           // Fetch channel details to get the avatar
           let avatarUrl = null;
-          try {
-            const channel = await youtube.getChannel(record.channelId);
-            // Extract avatar URL - adapt logic based on getChannel response structure
-            const header = channel.header;
-            const headerContent = header?.content; // Specific to PageHeader
-            const microformat = channel.metadata; // MicroformatData
 
-            const potentialAvatars = [
-              headerContent?.image?.avatar?.image?.[0]?.url, // From PageHeader
-              microformat?.avatar?.[0]?.url, // From MicroformatData
-              channel.header?.channel_header?.author?.thumbnails?.[0]?.url, // Another common path
-              channel.header?.author?.thumbnails?.[0]?.url // Fallback path
-            ];
-            avatarUrl = potentialAvatars.find(url => url && (url.startsWith('http://') || url.startsWith('https://'))) || null; // Use null if not found
+          if (!skipAvatars) {
+            // Store original console methods for restoration
+            const originalConsoleWarn = console.warn;
+            const originalConsoleError = console.error;
+            try {
+              // Temporarily suppress YouTube.js text parsing warnings
+              console.warn = () => { }; // Suppress warnings during channel fetch
+              console.error = (message, ...args) => {
+                // Only suppress YouTube.js text parsing errors
+                if (typeof message === 'string' && message.includes('[YOUTUBEJS][Text]')) {
+                  return;
+                }
+                originalConsoleError(message, ...args);
+              };
 
-            if (!avatarUrl) {
-              console.warn(`Could not find avatar for channel ${record.channelId} (${record.name}). Proceeding without it.`);
+              const channel = await youtube.getChannel(record.channelId);
+
+              // Restore original console methods
+              console.warn = originalConsoleWarn;
+              console.error = originalConsoleError;
+
+              // Extract avatar URL - adapt logic based on getChannel response structure
+              const header = channel.header;
+              const headerContent = header?.content; // Specific to PageHeader
+              const microformat = channel.metadata; // MicroformatData
+
+              const potentialAvatars = [
+                headerContent?.image?.avatar?.image?.[0]?.url, // From PageHeader
+                microformat?.avatar?.[0]?.url, // From MicroformatData
+                channel.header?.channel_header?.author?.thumbnails?.[0]?.url, // Another common path
+                channel.header?.author?.thumbnails?.[0]?.url // Fallback path
+              ];
+              avatarUrl = potentialAvatars.find(url => url && (url.startsWith('http://') || url.startsWith('https://'))) || null; // Use null if not found
+
+              if (!avatarUrl) {
+                console.warn(`Could not find avatar for channel ${record.channelId} (${record.name}). Proceeding without it.`);
+              }
+            } catch (channelError) {
+              // Restore original console methods in case of error
+              console.warn = originalConsoleWarn;
+              console.error = originalConsoleError;
+
+              console.error(`Error fetching channel details for ${record.channelId} (${record.name}):`, channelError.message);
+              // Continue import without avatar if fetching fails
+              errors.push(`Failed to fetch avatar for ${record.name} (${record.channelId}): ${channelError.message}`);
             }
-          } catch (channelError) {
-            console.error(`Error fetching channel details for ${record.channelId} (${record.name}):`, channelError.message);
-            // Continue import without avatar if fetching fails
-            errors.push(`Failed to fetch avatar for ${record.name} (${record.channelId}): ${channelError.message}`);
+          } else {
+            console.info(`Skipping avatar fetch for ${record.name} (skipAvatars=true)`);
           }
 
           // AddSubscription already handles INSERT OR IGNORE
