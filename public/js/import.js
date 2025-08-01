@@ -1,0 +1,219 @@
+import { showError, showLoading, hideLoading } from './utils.js';
+
+// DOM Elements
+const subscriptionsFileInput = document.getElementById('subscriptionsFileInput');
+const selectSubscriptionsFileBtn = document.getElementById('selectSubscriptionsFileBtn');
+const selectedSubscriptionsFile = document.getElementById('selectedSubscriptionsFile');
+const uploadSubscriptionsBtn = document.getElementById('uploadSubscriptionsBtn');
+const subscriptionsImportProgress = document.getElementById('subscriptionsImportProgress');
+const subscriptionsProgressBar = document.getElementById('subscriptionsProgressBar');
+const subscriptionsProgressText = document.getElementById('subscriptionsProgressText');
+
+const playlistsFileInput = document.getElementById('playlistsFileInput');
+const selectPlaylistsFileBtn = document.getElementById('selectPlaylistsFileBtn');
+const selectedPlaylistsFile = document.getElementById('selectedPlaylistsFile');
+const uploadPlaylistsBtn = document.getElementById('uploadPlaylistsBtn');
+const playlistsImportProgress = document.getElementById('playlistsImportProgress');
+const playlistsProgressBar = document.getElementById('playlistsProgressBar');
+const playlistsProgressText = document.getElementById('playlistsProgressText');
+
+const historyFileInput = document.getElementById('historyFileInput');
+const selectHistoryFileBtn = document.getElementById('selectHistoryFileBtn');
+const selectedHistoryFile = document.getElementById('selectedHistoryFile');
+const uploadHistoryBtn = document.getElementById('uploadHistoryBtn');
+const historyImportProgress = document.getElementById('historyImportProgress');
+const historyProgressBar = document.getElementById('historyProgressBar');
+const historyProgressText = document.getElementById('historyProgressText');
+
+// Utility function to show success message
+function showSuccess(message) {
+  const successDiv = document.createElement('div');
+  successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+  successDiv.textContent = message;
+  document.body.appendChild(successDiv);
+  setTimeout(() => successDiv.remove(), 5000);
+}
+
+// Generic file import handler
+async function handleFileImport(config) {
+  const {
+    file,
+    endpoint,
+    fieldName,
+    progressElement,
+    progressBar,
+    progressText,
+    uploadBtn,
+    selectBtn,
+    fileDisplayElement,
+    fileInput,
+    successMessage
+  } = config;
+
+  if (!file) {
+    showError('Please select a file first.');
+    return;
+  }
+
+  // Show progress
+  progressElement.classList.remove('hidden');
+  uploadBtn.disabled = true;
+  selectBtn.disabled = true;
+  progressBar.style.width = '0%';
+  progressText.textContent = 'Uploading...';
+
+  try {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      body: formData
+    });
+
+    progressBar.style.width = '100%';
+    progressText.textContent = 'Processing...';
+
+    const result = await response.json();
+
+    if (response.ok) {
+      // Success
+      progressText.textContent = 'Import completed successfully!';
+      setTimeout(() => {
+        progressElement.classList.add('hidden');
+        // Reset form
+        fileInput.value = '';
+        fileDisplayElement.textContent = '';
+        uploadBtn.disabled = true;
+        selectBtn.disabled = false;
+      }, 2000);
+
+      showSuccess(result.message || successMessage);
+    } else {
+      throw new Error(result.error || 'Import failed');
+    }
+  } catch (error) {
+    console.error('Error importing data:', error);
+    progressText.textContent = 'Import failed';
+    showError(`Import failed: ${error.message}`);
+  } finally {
+    setTimeout(() => {
+      progressElement.classList.add('hidden');
+      uploadBtn.disabled = false;
+      selectBtn.disabled = false;
+      progressBar.style.width = '0%';
+    }, 3000);
+  }
+}
+
+// Subscriptions Import Functionality
+function setupSubscriptionsImport() {
+  selectSubscriptionsFileBtn.addEventListener('click', () => {
+    subscriptionsFileInput.click();
+  });
+
+  subscriptionsFileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      selectedSubscriptionsFile.textContent = file.name;
+      uploadSubscriptionsBtn.disabled = false;
+    } else {
+      selectedSubscriptionsFile.textContent = '';
+      uploadSubscriptionsBtn.disabled = true;
+    }
+  });
+
+  uploadSubscriptionsBtn.addEventListener('click', async () => {
+    const file = subscriptionsFileInput.files[0];
+    await handleFileImport({
+      file,
+      endpoint: '/api/subscriptions/import',
+      fieldName: 'subscriptionsCsv',
+      progressElement: subscriptionsImportProgress,
+      progressBar: subscriptionsProgressBar,
+      progressText: subscriptionsProgressText,
+      uploadBtn: uploadSubscriptionsBtn,
+      selectBtn: selectSubscriptionsFileBtn,
+      fileDisplayElement: selectedSubscriptionsFile,
+      fileInput: subscriptionsFileInput,
+      successMessage: 'Subscriptions imported successfully!'
+    });
+  });
+}
+
+// Playlists Import Functionality
+function setupPlaylistsImport() {
+  selectPlaylistsFileBtn.addEventListener('click', () => {
+    playlistsFileInput.click();
+  });
+
+  playlistsFileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      selectedPlaylistsFile.textContent = file.name;
+      uploadPlaylistsBtn.disabled = false;
+    } else {
+      selectedPlaylistsFile.textContent = '';
+      uploadPlaylistsBtn.disabled = true;
+    }
+  });
+
+  uploadPlaylistsBtn.addEventListener('click', async () => {
+    const file = playlistsFileInput.files[0];
+    await handleFileImport({
+      file,
+      endpoint: '/api/playlists/import',
+      fieldName: 'playlistsFile',
+      progressElement: playlistsImportProgress,
+      progressBar: playlistsProgressBar,
+      progressText: playlistsProgressText,
+      uploadBtn: uploadPlaylistsBtn,
+      selectBtn: selectPlaylistsFileBtn,
+      fileDisplayElement: selectedPlaylistsFile,
+      fileInput: playlistsFileInput,
+      successMessage: 'Playlists imported successfully!'
+    });
+  });
+}
+
+// History Import Functionality
+function setupHistoryImport() {
+  selectHistoryFileBtn.addEventListener('click', () => {
+    historyFileInput.click();
+  });
+
+  historyFileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      selectedHistoryFile.textContent = file.name;
+      uploadHistoryBtn.disabled = false;
+    } else {
+      selectedHistoryFile.textContent = '';
+      uploadHistoryBtn.disabled = true;
+    }
+  });
+
+  uploadHistoryBtn.addEventListener('click', async () => {
+    const file = historyFileInput.files[0];
+    await handleFileImport({
+      file,
+      endpoint: '/api/watch-history/import',
+      fieldName: 'historyFile',
+      progressElement: historyImportProgress,
+      progressBar: historyProgressBar,
+      progressText: historyProgressText,
+      uploadBtn: uploadHistoryBtn,
+      selectBtn: selectHistoryFileBtn,
+      fileDisplayElement: selectedHistoryFile,
+      fileInput: historyFileInput,
+      successMessage: 'Watch history imported successfully!'
+    });
+  });
+}
+
+// Initialize all import functionality
+document.addEventListener('DOMContentLoaded', () => {
+  setupSubscriptionsImport();
+  setupPlaylistsImport();
+  setupHistoryImport();
+});

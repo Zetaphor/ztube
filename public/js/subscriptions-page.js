@@ -39,6 +39,8 @@ const allTabButtons = document.querySelectorAll('.tab-button');
 const allTabContents = document.querySelectorAll('.tab-content');
 
 const refreshFeedButton = document.getElementById('refreshFeedButton');
+
+
 const CACHE_KEY = 'subscriptionsFeedCache';
 const CACHE_EXPIRY_MINUTES = 30; // 30 minutes
 
@@ -100,8 +102,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (cacheAgeMinutes <= CACHE_EXPIRY_MINUTES) {
           // Cache is valid and not expired
-          console.info(`Loaded ${cachedItem.data.length} videos from valid cache.`);
-          allFetchedVideos = cachedItem.data; // Store cached videos
+          // Handle both old and new cache formats
+          let videos, shorts;
+          if (cachedItem.data.videos && cachedItem.data.shorts) {
+            // New separated format
+            videos = cachedItem.data.videos;
+            shorts = cachedItem.data.shorts;
+          } else if (Array.isArray(cachedItem.data)) {
+            // Old format - assume all are videos
+            videos = cachedItem.data;
+            shorts = [];
+          } else {
+            videos = [];
+            shorts = [];
+          }
+
+          console.info(`Loaded ${videos.length} videos and ${shorts.length} shorts from valid cache.`);
+          allFetchedVideos = videos;
+          window.allFetchedShorts = shorts;
 
           // ---> Clear app.js cache for these specific IDs before processing <---
           const cachedVideoIds = allFetchedVideos.map(v => v.id).filter(Boolean);
@@ -114,13 +132,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
           currentVideoIndex = 0; // Reset index
           displaySubscriptionVideos(); // Start display process
+          displaySubscriptionShorts(); // Display shorts
           shouldFetch = false; // Don't fetch immediately if valid cache is loaded
         } else {
           // Cache exists but is stale
           console.info(`Cache is stale (older than ${CACHE_EXPIRY_MINUTES} minutes). Displaying stale data and fetching fresh.`);
-          allFetchedVideos = cachedItem.data; // Still display stale data
+          // Handle both old and new cache formats for stale data too
+          let videos, shorts;
+          if (cachedItem.data.videos && cachedItem.data.shorts) {
+            videos = cachedItem.data.videos;
+            shorts = cachedItem.data.shorts;
+          } else if (Array.isArray(cachedItem.data)) {
+            videos = cachedItem.data;
+            shorts = [];
+          } else {
+            videos = [];
+            shorts = [];
+          }
+
+          allFetchedVideos = videos;
+          window.allFetchedShorts = shorts;
           currentVideoIndex = 0;
           displaySubscriptionVideos();
+          displaySubscriptionShorts();
           shouldFetch = true; // Mark for fetching fresh data
           cacheIsStale = true; // Flag that we are fetching due to stale cache
         }
@@ -146,6 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (refreshFeedButton) {
     refreshFeedButton.addEventListener('click', () => loadSubscriptionFeed(true, false)); // Explicit refresh is not due to stale cache
   }
+
+
 });
 
 function switchTab(targetTab) {
@@ -182,9 +218,9 @@ async function loadSubscriptionFeed(forceFetch = false, dueToStaleCache = false)
   // or an explicit refresh *not* caused by stale cache (where we already displayed old data)
   if (forceFetch && !localStorage.getItem(CACHE_KEY) && !dueToStaleCache) {
     videosContent.innerHTML = '<p class="col-span-full text-center text-zinc-500 py-8">Loading videos...</p>';
-    // Also potentially clear/reset shorts tab if needed
+    // Also clear/reset shorts tab if needed
     if (shortsContent) {
-      shortsContent.innerHTML = '<p class="col-span-full text-center text-zinc-500 py-8">Shorts content not yet implemented.</p>';
+      shortsContent.innerHTML = '<p class="col-span-full text-center text-zinc-500 py-8">Loading shorts...</p>';
     }
   }
 
@@ -192,36 +228,54 @@ async function loadSubscriptionFeed(forceFetch = false, dueToStaleCache = false)
   showLoading();
 
   try {
-    const response = await fetch('/api/subscriptions/feed');
+    const response = await fetch('/api/subscriptions/feed?separate=true');
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || `Failed to fetch subscription feed: ${response.status}`);
     }
-    const videos = await response.json();
+    const data = await response.json();
+
+    // Handle separated content or fallback to regular array
+    let videos, shorts;
+    if (data.videos && data.shorts) {
+      // Response was separated
+      videos = data.videos;
+      shorts = data.shorts;
+      console.info(`Fetched ${videos.length} videos and ${shorts.length} shorts from separated feed.`);
+    } else {
+      // Response was not separated (fallback to array)
+      videos = Array.isArray(data) ? data : [];
+      shorts = [];
+      console.info(`Fetched ${videos.length} items (no separation available).`);
+    }
 
     // Cache the new data with timestamp
     try {
       const itemToCache = {
-        data: videos,
+        data: { videos, shorts },
         timestamp: Date.now()
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(itemToCache));
-      console.info(`Cached ${videos.length} fetched items with timestamp.`);
+      console.info(`Cached ${videos.length} videos and ${shorts.length} shorts with timestamp.`);
     } catch (e) {
       console.error('Failed to cache subscription data:', e);
-      // localStorage.removeItem(CACHE_KEY);
     }
 
-    // Display the newly fetched data (in the Videos tab for now)
-    allFetchedVideos = videos; // Store fetched videos
-    currentVideoIndex = 0; // Reset index
-    displaySubscriptionVideos(); // Start display process
+    // Store separated data
+    allFetchedVideos = videos;
+    window.allFetchedShorts = shorts; // Store shorts globally for access
+    currentVideoIndex = 0;
+    displaySubscriptionVideos(); // Display videos
+    displaySubscriptionShorts(); // Display shorts
 
   } catch (error) {
     console.error('Failed to load subscription feed:', error);
     // Show error inline only if we didn't have any data displayed (initial load failed)
     if (!allFetchedVideos || allFetchedVideos.length === 0) {
       videosContent.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">Error loading subscription feed: ${error.message}</p>`;
+    }
+    if (shortsContent && (!window.allFetchedShorts || window.allFetchedShorts.length === 0)) {
+      shortsContent.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">Error loading shorts: ${error.message}</p>`;
     }
     // Always show toast error
     showError(`Error loading subscription feed: ${error.message}`);
@@ -242,8 +296,8 @@ function displaySubscriptionVideos() {
     existingSentinel?.remove();
   }
 
-  // TODO: Filter `allFetchedVideos` array here to separate actual videos and shorts once implemented.
-  const actualVideos = allFetchedVideos; // Placeholder: Assume all are videos for now
+  // Videos are already separated, no need to filter
+  const actualVideos = allFetchedVideos;
 
   if (!actualVideos || actualVideos.length === 0) {
     if (currentVideoIndex === 0) { // Only show if it's the initial load and empty
@@ -278,24 +332,89 @@ function displaySubscriptionVideos() {
   // --- Set up or update sentinel for Intersection Observer ---
   setupIntersectionObserver(actualVideos.length);
   // --- End Sentinel Setup ---
-
-  // --- Placeholder for Shorts Display (Remains unchanged for now) ---
-  if (shortsContent) {
-    const actualShorts = []; // Placeholder: No shorts identified yet
-    if (!actualShorts || actualShorts.length === 0) {
-      // Only set initial message if shorts tab is active and empty
-      if (!shortsContent.classList.contains('hidden')) {
-        shortsContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No shorts found yet, or filtering is not implemented.</p>';
-      }
-    } else {
-      // Logic to display shorts if/when available
-      // shortsContent.innerHTML = ''; // Clear placeholder if displaying
-      // actualShorts.forEach(short => { ... });
-    }
-  }
-  // --- End Placeholder ---
 }
 // --- End Updated Function ---
+
+// Display subscription shorts
+function displaySubscriptionShorts() {
+  if (!shortsContent) return;
+
+  const shorts = window.allFetchedShorts || [];
+
+  // Clear existing content
+  shortsContent.innerHTML = '';
+
+  if (!shorts || shorts.length === 0) {
+    shortsContent.innerHTML = '<p class="col-span-full text-center text-zinc-400 py-10">No shorts found in your subscription feeds.</p>';
+    return;
+  }
+
+  shorts.forEach(short => {
+    const card = createSubscriptionShortCard(short);
+    shortsContent.appendChild(card);
+  });
+
+  console.info(`Displayed ${shorts.length} shorts in subscription shorts tab.`);
+}
+
+// Create a short card for subscriptions (similar to video card but optimized for shorts)
+function createSubscriptionShortCard(short) {
+  const card = document.createElement('div');
+  card.className = 'short-card group bg-zinc-800 rounded-lg shadow-md overflow-hidden cursor-pointer transition-transform duration-200 hover:scale-105 relative';
+
+  const thumbnail = short.thumbnailUrl || short.thumbnails?.[0]?.url || '/img/default-video.png';
+  const shortTitle = short.title || 'Untitled Short';
+  const channelName = short.channelName || short.channel?.name || 'Unknown';
+  const viewCount = short.viewCount || '';
+
+  // Set up data attributes for consistency
+  card.dataset.videoId = short.id;
+  card.dataset.videoTitle = shortTitle;
+  card.dataset.channelName = channelName;
+  card.dataset.thumbnailUrl = thumbnail;
+
+  // Click handler to play the Short
+  card.onclick = () => {
+    if (typeof window.loadAndDisplayVideo === 'function') {
+      window.loadAndDisplayVideo(short.id, card);
+    }
+  };
+
+  const channelId = short.channelId || short.channel?.id;
+  const channelAvatarUrl = short.channelAvatar || short.channel?.avatar?.[0]?.url || '/img/default-avatar.svg';
+
+  card.innerHTML = `
+    <div class="short-thumbnail relative">
+      <img src="${thumbnail}" alt="${shortTitle} thumbnail" loading="lazy" class="w-full h-48 object-cover">
+      <!-- Shorts indicator -->
+      <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded flex items-center">
+        <i class="fas fa-play mr-1"></i>
+        <span>Short</span>
+      </div>
+      <!-- Thumbnail Hover Icons -->
+      <div class="thumbnail-icons absolute top-2 right-2 flex flex-col gap-1 z-10">
+        <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
+          <i class="fas fa-plus"></i>
+        </button>
+        <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
+          <i class="far fa-bookmark"></i>
+        </button>
+      </div>
+    </div>
+    <div class="p-2">
+      <h3 class="font-semibold text-zinc-100 text-sm line-clamp-2 mb-1 h-8">${shortTitle}</h3>
+      <div class="flex items-start text-xs text-zinc-400">
+        <img src="${channelAvatarUrl}" alt="${channelName}" class="w-4 h-4 rounded-full mr-1 flex-shrink-0">
+        <div class="flex flex-col">
+          <span class="text-xs truncate">${channelName}</span>
+          ${viewCount ? `<span class="text-xs">${viewCount}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  return card;
+}
 
 // --- New function to set up Intersection Observer ---
 function setupIntersectionObserver(totalVideos) {
@@ -504,3 +623,4 @@ function createSubscriptionVideoCard(video) {
 
   return card;
 }
+

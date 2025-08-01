@@ -7,6 +7,7 @@ import { XMLParser } from 'fast-xml-parser';
 import * as SubscriptionsRepo from '../db/subscriptionsRepository.js';
 import getYoutubeClient from '../utils/youtubeClient.js';
 import { formatViewCount, formatRelativeDate } from '../utils/formatters.js';
+import { separateVideosAndShorts } from '../utils/shortsDetection.js';
 
 const router = express.Router();
 
@@ -245,7 +246,10 @@ router.get('/feed', async (req, res) => {
             published: published, // Keep original for sorting
             publishedText: formatRelativeDate(published),
             thumbnailUrl: thumbnail,
-            viewCount: viewCount // Add the extracted view count
+            viewCount: viewCount, // Add the extracted view count
+            // Add placeholder duration for now - we'll enhance this later
+            duration: '0:00',
+            durationSeconds: 0
           };
         }).filter(video => video !== null); // Filter out null (skipped) entries
       } catch (error) {
@@ -260,7 +264,15 @@ router.get('/feed', async (req, res) => {
     // Sort by published date (descending)
     allVideos.sort((a, b) => new Date(b.published) - new Date(a.published));
     console.info(`Feed aggregation complete. Found ${allVideos.length} videos.`);
-    res.json(allVideos);
+
+    // Check if we should separate videos and Shorts
+    const separateContent = req.query.separate === 'true';
+    if (separateContent) {
+      const separated = separateVideosAndShorts(allVideos);
+      res.json(separated);
+    } else {
+      res.json(allVideos);
+    }
 
   } catch (error) {
     console.error('Error aggregating subscription feeds:', error);

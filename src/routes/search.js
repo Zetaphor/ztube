@@ -1,5 +1,6 @@
 import express from 'express';
 import getYoutubeClient from '../utils/youtubeClient.js';
+import { separateVideosAndShorts } from '../utils/shortsDetection.js';
 
 const router = express.Router();
 
@@ -18,17 +19,31 @@ router.get('/', async (req, res) => {
       id: video.id,
       title: video.title?.text || video.title || 'Untitled',
       duration: video.duration?.text || '0:00',
+      durationSeconds: video.duration?.seconds || 0,
       viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
       uploadedAt: video.published?.text || 'Unknown date',
       thumbnails: video.thumbnails || [],
       channel: {
         name: video.author?.name || 'Unknown',
         avatar: video.author?.thumbnails || [],
-        verified: video.author?.is_verified || false
+        verified: video.author?.is_verified || false,
+        id: video.author?.id || null
       }
     })) : [];
 
-    res.json(videos);
+    // Check if we should separate videos and Shorts or filter for Shorts only
+    const filterShorts = req.query.shorts_only === 'true';
+    const separateContent = req.query.separate === 'true';
+
+    if (filterShorts) {
+      const { shorts } = separateVideosAndShorts(videos);
+      res.json(shorts);
+    } else if (separateContent) {
+      const separated = separateVideosAndShorts(videos);
+      res.json(separated);
+    } else {
+      res.json(videos);
+    }
   } catch (error) {
     console.error('Search API error:', error);
     res.status(500).json({ error: `Search failed: ${error.message}` });

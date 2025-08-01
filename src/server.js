@@ -17,6 +17,7 @@ import playlistsRouter from './routes/playlists.js';
 import watchHistoryRouter from './routes/watchHistory.js';
 import hiddenContentRouter from './routes/hiddenContent.js';
 import settingsRouter from './routes/settings.js';
+import shortsRouter from './routes/shorts.js';
 
 // Import youtube client initializer (it runs itself)
 import './utils/youtubeClient.js';
@@ -52,6 +53,21 @@ app.get('/playlists/:id', (req, res) => {
   res.render('playlistDetail', { playlistId: req.params.id });
 });
 
+// Route for Shorts page
+app.get('/shorts', (req, res) => {
+  res.render('shorts');
+});
+
+// Route for Watch History page
+app.get('/history', (req, res) => {
+  res.render('history');
+});
+
+// Route for Import page
+app.get('/import', (req, res) => {
+  res.render('import');
+});
+
 // Mount Routers
 app.use('/api/search', searchRouter);
 app.use('/api/video', videoRouter);
@@ -61,6 +77,7 @@ app.use('/api/playlists', playlistsRouter);
 app.use('/api/watch-history', watchHistoryRouter);
 app.use('/api/hidden', hiddenContentRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/shorts', shortsRouter);
 
 // Start server
 app.listen(port, () => {

@@ -434,6 +434,14 @@ body {
   /* Prevent scrolling on the body */
 }
 
+/* Theater mode: remove width constraints and take full viewport width */
+#videoPlayer.theater-mode-active #videoPlayerContent {
+  max-width: none;
+  margin: 0;
+  padding: 0 1rem;
+  /* Remove centering and width constraints, add horizontal padding */
+}
+
 /* Ensure player can grow */
 #videoPlayer.theater-mode-active #videoAreaContainer {
   flex-grow: 1;
@@ -441,10 +449,10 @@ body {
 }
 
 #videoPlayer.theater-mode-active #player {
-  min-height: 50vh;
-  /* Set minimum height in theater mode */
-  aspect-ratio: auto;
-  /* Override any default aspect ratio if needed */
+  min-height: 70vh;
+  /* Increased height for theater mode */
+  aspect-ratio: 16/9;
+  /* Maintain standard video aspect ratio */
 }
 
 #closePlayer.theater-mode-active {
@@ -567,4 +575,68 @@ body {
 .recommended-channel a:hover {
   color: #22c55e;
   /* text-green-500 */
+}
+
+/* Shorts-specific styles */
+.short-card {
+  max-width: 200px;
+}
+
+.short-card .short-thumbnail {
+  aspect-ratio: 9/16;
+  /* Vertical aspect ratio for Shorts */
+  position: relative;
+  overflow: hidden;
+}
+
+.short-card .short-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Shorts indicator badge */
+.short-card .short-thumbnail .shorts-indicator {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Hover effects for Shorts */
+.short-card:hover .thumbnail-icons .thumbnail-icon-btn {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Responsive grid for Shorts */
+@media (max-width: 640px) {
+  #shortsContent {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+  #shortsContent {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  #shortsContent {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1025px) {
+  #shortsContent {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }

@@ -4,12 +4,18 @@
     <li class="mb-2"><a href="/"
         class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'home') ? 'text-green-500' : '' %>"><i
           class="fas fa-bookmark"></i></a></li>
+    <li class="mb-2"><a href="/shorts"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'shorts') ? 'text-green-500' : '' %>"><i
+          class="fas fa-play"></i></a></li>
     <li class="mb-2"><a href="/playlists"
         class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'playlists') ? 'text-green-500' : '' %>"><i
           class="fas fa-list-ul"></i></a></li>
-    <li class="mb-2"><a href="#"
+    <li class="mb-2"><a href="/history"
         class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'history') ? 'text-green-500' : '' %>"><i
           class="fas fa-history"></i></a></li>
+    <li class="mb-2"><a href="/import"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'import') ? 'text-green-500' : '' %>"><i
+          class="fas fa-download"></i></a></li>
     <li class="mb-2"><a href="#"
         class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'user') ? 'text-green-500' : '' %>"><i
           class="fas fa-user"></i></a></li>

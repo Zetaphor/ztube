@@ -6,6 +6,8 @@ const newPlaylistDescriptionInput = document.getElementById('newPlaylistDescript
 const createPlaylistBtn = document.getElementById('createPlaylistBtn');
 const errorDisplay = document.getElementById('errorDisplay');
 
+
+
 // Function to fetch and display playlists
 async function loadPlaylists() {
   showLoading();
@@ -300,9 +302,12 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
+
+
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists();
+
 
   if (createPlaylistBtn) {
     createPlaylistBtn.addEventListener('click', createPlaylist);

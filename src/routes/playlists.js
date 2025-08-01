@@ -1,7 +1,13 @@
 import express from 'express';
+import multer from 'multer';
+import { Readable } from 'stream';
 import * as PlaylistsRepo from '../db/playlistsRepository.js';
 
 const router = express.Router();
+
+// Multer configuration for handling file uploads in memory
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // Get all playlists
 router.get('/', async (req, res) => {
@@ -170,6 +176,139 @@ router.put('/:id/videos/order', async (req, res) => {
   } catch (error) {
     console.error(`API Error PUT /api/playlists/${playlistId}/videos/order:`, error);
     res.status(500).json({ error: `Failed to update video order for playlist ${playlistId}: ${error.message}` });
+  }
+});
+
+// API: Import Playlists from FreeTube NDJSON
+router.post('/import', upload.single('playlistsFile'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No playlists file uploaded.' });
+  }
+
+  try {
+    const fileBuffer = req.file.buffer;
+    const fileContent = fileBuffer.toString('utf8');
+    const lines = fileContent.split('\n').filter(line => line.trim());
+
+    let importedPlaylists = 0;
+    let importedVideos = 0;
+    const errors = [];
+
+    for (const line of lines) {
+      try {
+        const playlistData = JSON.parse(line);
+
+        // Extract playlist info
+        const playlistName = playlistData.playlistName;
+        const description = playlistData.description || '';
+        const videos = playlistData.videos || [];
+
+        if (!playlistName) {
+          console.warn('Skipping playlist due to missing name:', playlistData);
+          continue;
+        }
+
+        // Skip protected playlists like "Favorites" if needed
+        if (playlistData.protected && playlistName === 'Favorites') {
+          console.info(`Skipping protected playlist: ${playlistName}`);
+          continue;
+        }
+
+        try {
+          // Create or get playlist
+          const playlistId = await PlaylistsRepo.createPlaylist(playlistName, description);
+          importedPlaylists++;
+
+          // Add videos to playlist
+          for (const video of videos) {
+            try {
+              const videoId = video.videoId;
+              const title = video.title || 'Unknown Title';
+              const channelName = video.author || 'Unknown Channel';
+              const thumbnailUrl = video.thumbnailUrl || null;
+
+              if (videoId && title) {
+                await PlaylistsRepo.addVideoToPlaylist(
+                  playlistId,
+                  videoId,
+                  title,
+                  channelName,
+                  thumbnailUrl
+                );
+                importedVideos++;
+              }
+            } catch (videoError) {
+              console.error(`Error adding video to playlist ${playlistName}:`, videoError.message);
+              // Continue with other videos
+            }
+          }
+        } catch (playlistError) {
+          if (playlistError.message?.includes('UNIQUE constraint failed')) {
+            console.info(`Playlist "${playlistName}" already exists, adding videos to existing playlist`);
+            try {
+              // Get existing playlist
+              const existingPlaylists = await PlaylistsRepo.getAllPlaylists();
+              const existingPlaylist = existingPlaylists.find(p => p.name === playlistName);
+
+              if (existingPlaylist) {
+                // Add videos to existing playlist
+                for (const video of videos) {
+                  try {
+                    const videoId = video.videoId;
+                    const title = video.title || 'Unknown Title';
+                    const channelName = video.author || 'Unknown Channel';
+                    const thumbnailUrl = video.thumbnailUrl || null;
+
+                    if (videoId && title) {
+                      await PlaylistsRepo.addVideoToPlaylist(
+                        existingPlaylist.id,
+                        videoId,
+                        title,
+                        channelName,
+                        thumbnailUrl
+                      );
+                      importedVideos++;
+                    }
+                  } catch (videoError) {
+                    console.error(`Error adding video to existing playlist ${playlistName}:`, videoError.message);
+                    // Continue with other videos
+                  }
+                }
+              }
+            } catch (existingError) {
+              errors.push(`Failed to add videos to existing playlist "${playlistName}": ${existingError.message}`);
+            }
+          } else {
+            errors.push(`Failed to create playlist "${playlistName}": ${playlistError.message}`);
+          }
+        }
+      } catch (parseError) {
+        console.error('Error parsing playlist line:', parseError.message);
+        errors.push(`Failed to parse playlist entry: ${parseError.message}`);
+      }
+    }
+
+    console.info(`Playlist import finished. Imported ${importedPlaylists} playlists with ${importedVideos} videos.`);
+
+    if (errors.length > 0) {
+      res.status(207).json({
+        message: `Import partially completed. Successfully imported ${importedPlaylists} playlists with ${importedVideos} videos. Some errors occurred.`,
+        importedPlaylists,
+        importedVideos,
+        errors: errors
+      });
+    } else if (importedPlaylists > 0 || importedVideos > 0) {
+      res.status(200).json({
+        message: `Import successful. Added ${importedPlaylists} playlists with ${importedVideos} videos.`,
+        importedPlaylists,
+        importedVideos
+      });
+    } else {
+      res.status(400).json({ message: 'Import failed. No valid playlist entries found in the file.' });
+    }
+  } catch (error) {
+    console.error('Playlist Import Error:', error);
+    res.status(500).json({ error: `Failed to import playlists: ${error.message}` });
   }
 });
 

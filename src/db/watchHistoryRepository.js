@@ -31,6 +31,35 @@ export const upsertWatchHistory = (videoId, title, channelName, channelId, durat
 };
 
 /**
+ * Adds or updates a video in the watch history with a custom timestamp.
+ * @param {string} videoId
+ * @param {string} title
+ * @param {string} channelName
+ * @param {string} channelId
+ * @param {number} durationSeconds
+ * @param {number} watchedSeconds
+ * @param {string} [thumbnailUrl]
+ * @param {number} customTimestamp - Unix timestamp in seconds
+ * @returns {Promise<void>}
+ */
+export const upsertWatchHistoryWithTimestamp = (videoId, title, channelName, channelId, durationSeconds, watchedSeconds, thumbnailUrl = null, customTimestamp) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR REPLACE INTO watch_history (video_id, title, channel_name, channel_id, duration_seconds, watched_seconds, thumbnail_url, watched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [videoId, title, channelName, channelId, durationSeconds, watchedSeconds, thumbnailUrl, customTimestamp],
+      function (err) {
+        if (err) {
+          console.error(`Error upserting watch history for '${videoId}':`, err.message);
+          return reject(err);
+        }
+        console.log(`Watch history upserted for '${videoId}' with custom timestamp. Changes: ${this.changes}`);
+        resolve();
+      }
+    );
+  });
+};
+
+/**
  * Updates only the watched seconds and timestamp for a video.
  * @param {string} videoId
  * @param {number} watchedSeconds
@@ -58,15 +87,34 @@ export const updateWatchProgress = (videoId, watchedSeconds) => {
 };
 
 /**
- * Gets watch history entries, most recent first.
+ * Gets watch history entries with pagination and sorting.
  * @param {number} [limit=50] - Number of entries to retrieve.
  * @param {number} [offset=0] - Offset for pagination.
+ * @param {string} [sort='recent'] - Sort order: 'recent', 'oldest', 'title', 'channel'
  * @returns {Promise<Array<object>>}
  */
-export const getWatchHistory = (limit = 50, offset = 0) => {
+export const getWatchHistory = (limit = 50, offset = 0, sort = 'recent') => {
   return new Promise((resolve, reject) => {
+    let orderBy = 'watched_at DESC'; // Default: most recent first
+
+    switch (sort) {
+      case 'oldest':
+        orderBy = 'watched_at ASC';
+        break;
+      case 'title':
+        orderBy = 'title ASC';
+        break;
+      case 'channel':
+        orderBy = 'channel_name ASC';
+        break;
+      case 'recent':
+      default:
+        orderBy = 'watched_at DESC';
+        break;
+    }
+
     db.all(
-      'SELECT video_id, title, channel_name, channel_id, watched_at, duration_seconds, watched_seconds, thumbnail_url FROM watch_history ORDER BY watched_at DESC LIMIT ? OFFSET ?',
+      `SELECT rowid as id, video_id, title, channel_name, channel_id, watched_at, duration_seconds, watched_seconds, thumbnail_url FROM watch_history ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
       [limit, offset],
       (err, rows) => {
         if (err) {
@@ -101,7 +149,7 @@ export const getWatchHistoryEntry = (videoId) => {
 };
 
 /**
- * Deletes a specific entry from watch history.
+ * Deletes a specific entry from watch history by video ID.
  * @param {string} videoId
  * @returns {Promise<void>}
  */
@@ -113,6 +161,24 @@ export const deleteWatchHistoryEntry = (videoId) => {
         return reject(err);
       }
       console.log(`Watch history entry deleted for '${videoId}'. Changes: ${this.changes}`);
+      resolve();
+    });
+  });
+};
+
+/**
+ * Deletes a specific entry from watch history by entry ID.
+ * @param {number} id
+ * @returns {Promise<void>}
+ */
+export const deleteWatchHistoryEntryById = (id) => {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM watch_history WHERE rowid = ?', [id], function (err) {
+      if (err) {
+        console.error(`Error deleting watch history entry ${id}:`, err.message);
+        return reject(err);
+      }
+      console.log(`Watch history entry deleted for ID ${id}. Changes: ${this.changes}`);
       resolve();
     });
   });

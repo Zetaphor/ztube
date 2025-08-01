@@ -1,15 +1,24 @@
 import express from 'express';
+import multer from 'multer';
+import { Readable } from 'stream';
 import * as WatchHistoryRepo from '../db/watchHistoryRepository.js';
 
 const router = express.Router();
 
-// Get watch history with pagination
+// Multer configuration for handling file uploads in memory
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// Get watch history with pagination and sorting
 router.get('/', async (req, res) => {
-  const limit = parseInt(req.query.limit, 10) || 50;
-  const offset = parseInt(req.query.offset, 10) || 0;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const offset = (page - 1) * limit;
+  const sort = req.query.sort || 'recent';
+
   try {
-    const history = await WatchHistoryRepo.getWatchHistory(limit, offset);
-    res.json(history);
+    const history = await WatchHistoryRepo.getWatchHistory(limit, offset, sort);
+    res.json({ history, page, limit });
   } catch (error) {
     console.error('API Error GET /api/watch-history:', error);
     res.status(500).json({ error: 'Failed to retrieve watch history' });
@@ -70,8 +79,23 @@ router.put('/:videoId/progress', async (req, res) => {
   }
 });
 
-// Delete a specific watch history entry
-router.delete('/:videoId', async (req, res) => {
+// Delete a specific watch history entry by ID
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing entry ID in request parameters' });
+  }
+  try {
+    await WatchHistoryRepo.deleteWatchHistoryEntryById(id);
+    res.status(200).json({ message: `Watch history entry deleted` });
+  } catch (error) {
+    console.error(`API Error DELETE /api/watch-history/${id}:`, error);
+    res.status(500).json({ error: `Failed to delete watch history entry: ${error.message}` });
+  }
+});
+
+// Delete a specific watch history entry by video ID (keep for backward compatibility)
+router.delete('/video/:videoId', async (req, res) => {
   const { videoId } = req.params;
   if (!videoId) {
     return res.status(400).json({ error: 'Missing videoId in request parameters' });
@@ -80,18 +104,18 @@ router.delete('/:videoId', async (req, res) => {
     await WatchHistoryRepo.deleteWatchHistoryEntry(videoId);
     res.status(200).json({ message: `Watch history entry deleted for video ${videoId}` });
   } catch (error) {
-    console.error(`API Error DELETE /api/watch-history/${videoId}:`, error);
+    console.error(`API Error DELETE /api/watch-history/video/${videoId}:`, error);
     res.status(500).json({ error: `Failed to delete watch history entry for video ${videoId}: ${error.message}` });
   }
 });
 
 // Clear all watch history
-router.delete('/', async (req, res) => {
+router.delete('/clear', async (req, res) => {
   try {
     await WatchHistoryRepo.clearWatchHistory();
     res.status(200).json({ message: 'Watch history cleared successfully.' });
   } catch (error) {
-    console.error('API Error DELETE /api/watch-history:', error);
+    console.error('API Error DELETE /api/watch-history/clear:', error);
     res.status(500).json({ error: 'Failed to clear watch history' });
   }
 });
@@ -119,6 +143,85 @@ router.post('/batch-status', async (req, res) => {
   } catch (error) {
     console.error(`API Error POST /api/watch-history/batch-status for IDs [${validVideoIds.join(', ')}]:`, error);
     res.status(500).json({ error: 'Failed to retrieve batch watch history status' });
+  }
+});
+
+// API: Import Watch History from FreeTube NDJSON
+router.post('/import', upload.single('historyFile'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No history file uploaded.' });
+  }
+
+  try {
+    const fileBuffer = req.file.buffer;
+    const fileContent = fileBuffer.toString('utf8');
+    const lines = fileContent.split('\n').filter(line => line.trim());
+
+    let importedCount = 0;
+    const errors = [];
+
+    for (const line of lines) {
+      try {
+        const historyEntry = JSON.parse(line);
+
+        // Extract relevant fields from FreeTube format
+        const videoId = historyEntry.videoId;
+        const title = historyEntry.title || 'Unknown Title';
+        const channelName = historyEntry.author || 'Unknown Channel';
+        const channelId = historyEntry.authorId || '';
+        const durationSeconds = historyEntry.lengthSeconds || 0;
+
+        // Calculate watched seconds from FreeTube's watchProgress (percentage)
+        const watchProgress = historyEntry.watchProgress || 0;
+        const watchedSeconds = Math.floor((watchProgress / 100) * durationSeconds);
+
+        // Convert FreeTube timestamp from milliseconds to Unix seconds
+        const timeWatchedMs = historyEntry.timeWatched || Date.now();
+        const timeWatchedSeconds = Math.floor(timeWatchedMs / 1000);
+
+        // Use FreeTube's timeWatched as the thumbnail URL placeholder (we don't have thumbnail in FreeTube export)
+        const thumbnailUrl = null;
+
+        if (videoId && title) {
+          await WatchHistoryRepo.upsertWatchHistoryWithTimestamp(
+            videoId,
+            title,
+            channelName,
+            channelId,
+            durationSeconds,
+            watchedSeconds,
+            thumbnailUrl,
+            timeWatchedSeconds
+          );
+          importedCount++;
+        } else {
+          console.warn('Skipping entry due to missing videoId or title:', historyEntry);
+        }
+      } catch (parseError) {
+        console.error('Error parsing line:', parseError.message);
+        errors.push(`Failed to parse entry: ${parseError.message}`);
+      }
+    }
+
+    console.info(`History import finished. Imported ${importedCount} entries.`);
+
+    if (errors.length > 0) {
+      res.status(207).json({
+        message: `Import partially completed. Successfully imported ${importedCount} history entries. Some errors occurred.`,
+        imported: importedCount,
+        errors: errors
+      });
+    } else if (importedCount > 0) {
+      res.status(200).json({
+        message: `Import successful. Added or updated ${importedCount} history entries.`,
+        imported: importedCount
+      });
+    } else {
+      res.status(400).json({ message: 'Import failed. No valid history entries found in the file.' });
+    }
+  } catch (error) {
+    console.error('History Import Error:', error);
+    res.status(500).json({ error: `Failed to import history: ${error.message}` });
   }
 });
 
