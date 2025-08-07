@@ -39,26 +39,17 @@ function extractVideoId(url) {
 
 // Handle URLs passed to the application
 function handleUrl(url) {
-  console.log(`[Main Process] Handling URL: ${url}`);
-
   // Extract video ID from the URL
   const videoId = extractVideoId(url);
 
   if (videoId) {
-    console.log(`[Main Process] Extracted video ID: ${videoId}`);
-
     if (mainWindow && mainWindow.webContents) {
       // If window is ready, send video ID directly
-      console.log(`[Main Process] Sending IPC message 'load-video-from-main' with videoId: ${videoId}`);
       mainWindow.webContents.send('load-video-from-main', videoId);
-      console.log(`[Main Process] IPC message sent successfully`);
     } else {
-      console.log(`[Main Process] Window not ready, storing URL for later: ${url}`);
       // Store URL for when window is ready
       pendingUrl = url;
     }
-  } else {
-    console.warn(`[Main Process] Could not extract video ID from URL: ${url}`);
   }
 }
 
