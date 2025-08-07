@@ -15,6 +15,12 @@ Privacy‑first YouTube client with a clean UI, local storage, and optional desk
 - **Local-first**: SQLite at `~/.config/ztube/ztube.db` (auto‑migrates from project root if present).
 - **LibRedirect**: Open `freetube://` links directly in ZTube. See `LIBREDIRECT_SETUP.md`.
 
+### Download
+
+Downloads for Linux (AppImage) and Windows can be found on [the releases page](https://github.com/Zetaphor/ztube/releases).
+
+**Note that the I only test the Linux releases. The Windows builds are completely automated and provided as a courtesy with no guarantee of functionality.**
+
 ### Use ZTube
 1) Install dependencies (first run)
 ```bash
