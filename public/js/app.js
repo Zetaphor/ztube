@@ -748,32 +748,7 @@ window.addEventListener('popstate', (event) => {
   }
 });
 
-// Set up IPC listener immediately when script loads
-if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
-  window.electronAPI.onVideoLoadRequest((videoId) => {
-    if (videoId && typeof videoId === 'string') {
-      // Wait for DOM to be ready if it's not already
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          try {
-            window.loadAndDisplayVideo(videoId, null);
-          } catch (error) {
-            console.error(`Error loading video via IPC:`, error);
-            showError(`Failed to load video: ${error.message}`);
-          }
-        });
-      } else {
-        try {
-          // Call the global function, passing null for the element
-          window.loadAndDisplayVideo(videoId, null);
-        } catch (error) {
-          console.error(`Error loading video via IPC:`, error);
-          showError(`Failed to load video: ${error.message}`);
-        }
-      }
-    }
-  });
-}
+// IPC handling moved to subscriptions-page.js since subscriptions is now the default page
 
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -782,15 +757,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
   const content = document.getElementById('content');
 
-  // Check if we need to load a video from URL parameter
-  if (videoParam) {
-    window.loadAndDisplayVideo(videoParam, null, true);
-  } else if (queryParam && searchInput && content) {
-    searchInput.value = queryParam;
-    performSearch();
-  } else if (content && window.location.pathname === '/') {
-    // Only load trending videos on the main index page
-    loadTrendingVideos();
+  // URL parameter handling moved to subscriptions-page.js for the default route
+  // Only handle parameters here for non-default pages
+  if (window.location.pathname !== '/') {
+    // Check if we need to load a video from URL parameter on non-default pages
+    if (videoParam) {
+      window.loadAndDisplayVideo(videoParam, null, true);
+    } else if (queryParam && searchInput && content) {
+      searchInput.value = queryParam;
+      performSearch();
+    } else if (content && window.location.pathname === '/home') {
+      // Load trending videos only on the old home page
+      loadTrendingVideos();
+    }
   }
 
   // --- Event Listener for Updating Bookmark Icons ---

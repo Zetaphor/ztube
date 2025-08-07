@@ -83,6 +83,25 @@ document.addEventListener('DOMContentLoaded', () => {
   videosTab?.addEventListener('click', () => switchTab('videos'));
   shortsTab?.addEventListener('click', () => switchTab('shorts'));
 
+  // === Handle URL Parameters ===
+  const urlParams = new URLSearchParams(window.location.search);
+  const queryParam = urlParams.get('query');
+  const videoParam = urlParams.get('v');
+  const searchInput = document.getElementById('searchInput');
+
+  // Check if we need to load a video from URL parameter
+  if (videoParam) {
+    window.loadAndDisplayVideo(videoParam, null, true);
+    return; // Don't load subscription feed if we're loading a video
+  } else if (queryParam && searchInput) {
+    // If there's a search query, perform the search
+    searchInput.value = queryParam;
+    if (typeof window.performSearch === 'function') {
+      window.performSearch();
+    }
+    return; // Don't load subscription feed if we're performing a search
+  }
+
   // Try loading from cache first
   const cachedDataString = localStorage.getItem(CACHE_KEY);
   let shouldFetch = true; // Assume we need to fetch by default
@@ -664,4 +683,60 @@ function createSubscriptionVideoCard(video) {
 
   return card;
 }
+
+// === IPC and URL Parameter Handling (moved from app.js) ===
+
+// Set up IPC listener immediately when script loads
+if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
+  window.electronAPI.onVideoLoadRequest((videoId) => {
+    if (videoId && typeof videoId === 'string') {
+      // Wait for DOM to be ready if it's not already
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          try {
+            window.loadAndDisplayVideo(videoId, null);
+          } catch (error) {
+            console.error(`Error loading video via IPC:`, error);
+            showError(`Failed to load video: ${error.message}`);
+          }
+        });
+      } else {
+        try {
+          // Call the global function, passing null for the element
+          window.loadAndDisplayVideo(videoId, null);
+        } catch (error) {
+          console.error(`Error loading video via IPC:`, error);
+          showError(`Failed to load video: ${error.message}`);
+        }
+      }
+    }
+  });
+}
+
+// Handle browser back/forward navigation for video URLs
+window.addEventListener('popstate', (event) => {
+  const currentUrl = new URL(window.location);
+  const videoId = currentUrl.searchParams.get('v');
+
+  const videoPlayerContainer = document.getElementById('videoPlayer');
+  const mainContentContainer = document.querySelector('#main-content > main');
+
+  if (videoId) {
+    // User navigated to a video URL
+    if (videoPlayerContainer && videoPlayerContainer.classList.contains('hidden')) {
+      // Video player is hidden, load the video (skip history since this is from popstate)
+      window.loadAndDisplayVideo(videoId, null, true);
+    }
+  } else {
+    // User navigated away from video URL
+    if (videoPlayerContainer && !videoPlayerContainer.classList.contains('hidden')) {
+      // Video player is visible, close it without pushing new history
+      if (typeof window.closeVideoPlayer === 'function') {
+        window.closeVideoPlayer(true);
+      }
+    }
+  }
+});
+
+// URL parameter handling is now integrated into the main DOMContentLoaded handler above
 
