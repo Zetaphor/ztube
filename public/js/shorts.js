@@ -162,6 +162,7 @@ function createShortCard(short) {
   const shortTitle = short.title || 'Untitled Short';
   const channelNameText = short.channel?.name || 'Unknown';
   const views = short.viewCount || '';
+  const channelId = short.channel?.id;
 
   // Set up data attributes for consistency with video cards
   card.dataset.videoId = short.id;
@@ -177,7 +178,6 @@ function createShortCard(short) {
     }
   };
 
-  const channelId = short.channel?.id;
   const verifiedBadge = short.channel?.verified ?
     '<i class="fas fa-check-circle text-green-500 ml-1 text-xs" title="Verified Channel"></i>' :
     '';
