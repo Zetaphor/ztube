@@ -588,6 +588,9 @@ function createSubscriptionVideoCard(video) {
                          <button class="copy-link-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-t-lg flex items-center" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}'); this.closest('.absolute').classList.add('hidden');">
                              <i class="fas fa-link mr-2"></i>Copy Link
                          </button>
+                          <button class="mark-watched-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 hidden flex items-center" onclick="event.stopPropagation(); this.closest('.absolute').classList.add('hidden');" title="Mark as Watched">
+                              <i class="fas fa-check-circle mr-2"></i>Mark as Watched
+                          </button>
                          <button class="remove-history-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 hidden flex items-center" onclick="event.stopPropagation(); this.closest('.absolute').classList.add('hidden');" title="Remove from History">
                              <i class="fas fa-eye-slash mr-2"></i>Remove from History
                          </button>

@@ -744,6 +744,9 @@ function createVideoCard(video) {
                         <button class="copy-link-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-t-lg flex items-center" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}'); this.closest('.absolute').classList.add('hidden');">
                             <i class="fas fa-link mr-2"></i>Copy Link
                         </button>
+                         <button class="mark-watched-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 hidden flex items-center" onclick="event.stopPropagation(); this.closest('.absolute').classList.add('hidden');" title="Mark as Watched">
+                             <i class="fas fa-check-circle mr-2"></i>Mark as Watched
+                         </button>
                         <button class="remove-history-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 hidden flex items-center" onclick="event.stopPropagation(); this.closest('.absolute').classList.add('hidden');" title="Remove from History">
                             <i class="fas fa-eye-slash mr-2"></i>Remove from History
                         </button>
@@ -1082,6 +1085,7 @@ function updateWatchHistoryUI(cardElement, historyData) {
   const progressContainer = cardElement.querySelector('.watch-history-progress');
   const progressBar = cardElement.querySelector('.watch-history-progress-bar');
   const removeHistoryBtn = cardElement.querySelector('.remove-history-btn'); // Find the new button
+  const markWatchedBtn = cardElement.querySelector('.mark-watched-btn');
 
   // --- Remove existing listener to prevent duplicates ---
   // Clone the button and replace it to remove all old listeners safely
@@ -1092,7 +1096,15 @@ function updateWatchHistoryUI(cardElement, historyData) {
   }
   // --- End Listener Removal ---
 
-  if (!overlay || !progressContainer || !progressBar || !newRemoveHistoryBtn) {
+  // --- Remove existing listener from Mark as Watched button to prevent duplicates ---
+  let newMarkWatchedBtn = markWatchedBtn;
+  if (markWatchedBtn) {
+    newMarkWatchedBtn = markWatchedBtn.cloneNode(true);
+    markWatchedBtn.parentNode.replaceChild(newMarkWatchedBtn, markWatchedBtn);
+  }
+  // --- End Listener Removal ---
+
+  if (!overlay || !progressContainer || !progressBar || !newRemoveHistoryBtn || !newMarkWatchedBtn) {
     // console.warn('Watch history UI elements not found in card:', cardElement);
     return;
   }
@@ -1101,6 +1113,7 @@ function updateWatchHistoryUI(cardElement, historyData) {
     overlay.classList.remove('hidden');
     progressContainer.classList.remove('hidden');
     newRemoveHistoryBtn.classList.remove('hidden'); // Show the button
+    newMarkWatchedBtn.classList.add('hidden'); // Hide mark watched when already in history
 
     // Attach click listener ONLY when shown
     newRemoveHistoryBtn.addEventListener('click', async (e) => {
@@ -1164,6 +1177,77 @@ function updateWatchHistoryUI(cardElement, historyData) {
     overlay.classList.add('hidden');
     progressContainer.classList.add('hidden');
     progressBar.style.width = '0%';
+    newRemoveHistoryBtn.classList.add('hidden');
+    newMarkWatchedBtn.classList.remove('hidden');
+
+    // Attach click listener to mark as watched
+    newMarkWatchedBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const videoId = cardElement.dataset.videoId;
+      const videoTitle = cardElement.dataset.videoTitle || 'Unknown';
+      const channelName = cardElement.dataset.channelName || 'Unknown';
+      const channelId = cardElement.dataset.channelId || '';
+      const thumbnailUrl = cardElement.dataset.thumbnailUrl || '/img/default-video.png';
+
+      if (!videoId || !channelId) {
+        showError('Missing video or channel information to mark as watched.');
+        return;
+      }
+
+      // Visual loading state
+      newMarkWatchedBtn.disabled = true;
+      const icon = newMarkWatchedBtn.querySelector('i');
+      const originalIconClass = icon ? icon.className : '';
+      if (icon) icon.className = 'fas fa-spinner fa-spin mr-2';
+
+      try {
+        // Fetch video details to get durationSeconds
+        let durationSeconds = 0;
+        try {
+          const detailsResp = await fetch(`/api/video/${videoId}`);
+          if (detailsResp.ok) {
+            const details = await detailsResp.json();
+            durationSeconds = Number(details.durationSeconds) || 0;
+          }
+        } catch (_) { /* ignore details fetch errors, fallback below */ }
+
+        // Fallback duration if unavailable
+        if (!durationSeconds || Number.isNaN(durationSeconds)) {
+          durationSeconds = 1; // minimal value to represent watched
+        }
+
+        const body = {
+          videoId,
+          title: videoTitle,
+          channelName,
+          channelId,
+          durationSeconds,
+          watchedSeconds: durationSeconds,
+          thumbnailUrl
+        };
+
+        const response = await fetch('/api/watch-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `API Error: ${response.status}`);
+        }
+
+        // Update cache and UI to reflect fully watched
+        knownHistoryStatus[videoId] = { watchedSeconds: durationSeconds, durationSeconds };
+        updateWatchHistoryUI(cardElement, knownHistoryStatus[videoId]);
+
+      } catch (error) {
+        console.error(`Failed to mark ${videoId} as watched:`, error);
+        showError(`Error marking as watched: ${error.message}`);
+        newMarkWatchedBtn.disabled = false;
+        if (icon) icon.className = originalIconClass;
+      }
+    });
   }
 
   // --- Restore button state (e.g., re-enable if it was disabled) ---
