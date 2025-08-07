@@ -40,6 +40,7 @@
   "build": {
     "appId": "com.zetaphor.ztube",
     "productName": "ZTube",
+    "icon": "public/img/icon.png",
     "files": [
       "**/*",
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
@@ -63,6 +64,7 @@
       "target": [
         "AppImage"
       ],
+      "icon": "public/img/icon.png",
       "category": "AudioVideo",
       "desktop": {
         "Name": "ZTube",
@@ -76,12 +78,14 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "public/img/icon.png"
     },
     "mac": {
       "target": [
         "dmg"
-      ]
+      ],
+      "icon": "public/img/icon.png"
     }
   }
 }

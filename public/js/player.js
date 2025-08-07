@@ -35,10 +35,14 @@ const getChaptersList = () => getElement('chaptersList');
 const getCurrentChapterTitle = () => getElement('currentChapterTitle');
 const getChapterToggleIcon = () => getElement('chapterToggleIcon');
 const getQualityBtn = () => getElement('qualityBtn');
+const getTimelineTooltip = () => getElement('timeline-tooltip');
+const getTimelineTooltipTime = () => getElement('timeline-tooltip-time');
+const getTimelineTooltipChapter = () => getElement('timeline-tooltip-chapter');
 
 // === Event Handlers (Private) ===
 
 // -- Watch History Helpers --
+
 
 /** Tries to fetch watch history and seek the player */
 async function seekToWatchedTime() {
@@ -543,6 +547,59 @@ function handleKeydown(event) {
   }
 }
 
+function handleTimelineHover(event) {
+  const progressBar = getProgressBar();
+  const tooltip = getTimelineTooltip();
+  const tooltipTime = getTimelineTooltipTime();
+  const tooltipChapter = getTimelineTooltipChapter();
+
+  if (!progressBar || !tooltip || !tooltipTime || !tooltipChapter || !ytPlayer || typeof ytPlayer.getDuration !== 'function') {
+    return;
+  }
+
+  const rect = progressBar.getBoundingClientRect();
+  const pos = (event.clientX - rect.left) / rect.width;
+  const durationVal = ytPlayer.getDuration();
+
+  if (!durationVal || durationVal <= 0) {
+    return;
+  }
+
+  const hoverTime = pos * durationVal;
+
+  // --- Find Chapter ---
+  let hoverChapter = null;
+  if (videoChapters && videoChapters.length > 0) {
+    for (let i = videoChapters.length - 1; i >= 0; i--) {
+      if (hoverTime >= videoChapters[i].startTimeSeconds) {
+        hoverChapter = videoChapters[i];
+        break;
+      }
+    }
+  }
+
+  // --- Update Tooltip ---
+  tooltipTime.textContent = formatTime(hoverTime);
+  if (hoverChapter) {
+    tooltipChapter.textContent = hoverChapter.title;
+    tooltipChapter.classList.remove('hidden');
+  } else {
+    tooltipChapter.classList.add('hidden');
+  }
+
+  // --- Position Tooltip ---
+  const tooltipWidth = tooltip.offsetWidth;
+  const progressBarWidth = progressBar.offsetWidth;
+  let newLeft = event.clientX - rect.left - (tooltipWidth / 2);
+
+  // Clamp position to be within the progress bar
+  newLeft = Math.max(0, newLeft);
+  newLeft = Math.min(progressBarWidth - tooltipWidth, newLeft);
+
+  tooltip.style.left = `${newLeft}px`;
+  tooltip.classList.remove('hidden');
+}
+
 // === Chapter Functions (Private) ===
 function displayChapters(chapters) {
   const chaptersAccordion = getChaptersAccordion();
@@ -747,6 +804,13 @@ function setupCustomControls() {
       e.preventDefault(); // Prevent potential ghost clicks
       seek(e);
     };
+    progressBar.addEventListener('mousemove', handleTimelineHover);
+    progressBar.addEventListener('mouseleave', () => {
+      const tooltip = getTimelineTooltip();
+      if (tooltip) {
+        tooltip.classList.add('hidden');
+      }
+    });
   }
 
   if (volumeBtn) volumeBtn.onclick = toggleMute;

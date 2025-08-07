@@ -110,10 +110,14 @@ function startServer() {
 
 // Create the browser window
 function createWindow() {
+  const iconPath = path.resolve(__dirname, 'public', 'img', 'icon.png');
+  console.log(`[Main Process] Using icon path: ${iconPath}`);
+  console.log(`[Main Process] Icon file exists: ${fs.existsSync(iconPath)}`);
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(__dirname, 'public', 'img', 'icon.png'),
+    icon: iconPath,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -125,6 +129,12 @@ function createWindow() {
   });
 
   mainWindow.setMenuBarVisibility(false);
+
+  // Additional Linux icon setup
+  if (process.platform === 'linux') {
+    // Force icon update on Linux
+    mainWindow.setIcon(iconPath);
+  }
 
   // --- Replace 'new-window' listener with setWindowOpenHandler ---
   mainWindow.webContents.setWindowOpenHandler(({ url, disposition, features, frameName, referrer, postBody }) => {
