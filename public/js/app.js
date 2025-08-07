@@ -144,6 +144,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, s
       const avatarUrl = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
       console.log("[DEBUG] Setting channel avatar to:", avatarUrl);
       channelAvatar.src = avatarUrl;
+      channelAvatar.alt = `${videoDetails.author?.name || 'Unknown'} avatar`;
     }
 
     // Add Hover Effect Listeners (Remains in app.js)
@@ -219,7 +220,7 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, s
     if (videoPlayerSubscribeBtn) {
       videoPlayerSubscribeBtn.dataset.channelId = videoDetails.author?.id;
       videoPlayerSubscribeBtn.dataset.channelName = videoDetails.author?.name;
-      videoPlayerSubscribeBtn.dataset.channelAvatar = videoDetails.author?.thumbnails?.[0]?.url || '';
+      videoPlayerSubscribeBtn.dataset.channelAvatar = videoDetails.author?.thumbnails?.[0]?.url || '/img/default-avatar.svg';
       setupSubscribeButton(videoPlayerSubscribeBtn); // Call the setup function
     }
     // -- End Setup --
@@ -363,10 +364,20 @@ window.onYouTubeIframeAPIReady = function () {
 
 // --- App Level Functions --- (Search, Comments, Recommendations, etc.)
 
+// Global variable to store current search query and sort
+let currentSearchQuery = '';
+let currentSortBy = 'newest'; // Default to newest first
+
 // Search Functions
-async function performSearch() {
+async function performSearch(sortBy = null) {
   const query = searchInput.value.trim();
   if (!query) return;
+
+  // Update current search query and sort
+  currentSearchQuery = query;
+  if (sortBy !== null) {
+    currentSortBy = sortBy;
+  }
 
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get player container
 
@@ -382,7 +393,7 @@ async function performSearch() {
   if (mainContentArea) {
     try {
       showLoading();
-      const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&sort=${currentSortBy}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Search failed: ${response.status}`);
@@ -407,6 +418,17 @@ async function performSearch() {
     console.warn("Could not find the main content area (#main-content > main). Redirecting to index search.");
     window.location.href = `/?query=${encodeURIComponent(query)}`;
   }
+}
+
+// Function to perform search with a specific sort option
+async function performSearchWithSort(sortBy) {
+  if (!currentSearchQuery) {
+    const query = searchInput.value.trim();
+    if (!query) return;
+    currentSearchQuery = query;
+  }
+
+  await performSearch(sortBy);
 }
 
 async function loadTrendingVideos() {
@@ -461,6 +483,36 @@ function displayResults(results, mainContentElement) {
   // Remove any specific layout classes from the main element itself if necessary
   mainContentElement.className = 'container mx-auto p-4 flex-grow'; // Reset to default main classes
 
+  // Create sort controls section
+  const sortControlsContainer = document.createElement('div');
+  sortControlsContainer.className = 'mb-4 flex flex-wrap items-center gap-2';
+
+  const sortLabel = document.createElement('span');
+  sortLabel.className = 'text-zinc-300 text-sm font-medium';
+  sortLabel.textContent = 'Sort by:';
+
+  // Sort button options
+  const sortOptions = [
+    { value: 'newest', label: 'Newest' },
+    { value: 'relevance', label: 'Relevance' },
+    { value: 'views', label: 'Most Views' },
+    { value: 'duration', label: 'Duration' },
+    { value: 'oldest', label: 'Oldest' }
+  ];
+
+  sortControlsContainer.appendChild(sortLabel);
+
+  sortOptions.forEach(option => {
+    const button = document.createElement('button');
+    button.className = `px-3 py-1.5 text-sm rounded-lg transition-colors ${currentSortBy === option.value
+        ? 'bg-green-600 text-white'
+        : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+      }`;
+    button.textContent = option.label;
+    button.onclick = () => performSearchWithSort(option.value);
+    sortControlsContainer.appendChild(button);
+  });
+
   // Create the grid container *inside* the main element
   const gridContainer = document.createElement('div');
   gridContainer.id = 'content'; // Give it the ID used by index page for consistency
@@ -475,7 +527,8 @@ function displayResults(results, mainContentElement) {
     });
   }
 
-  // Append the new grid container to the main content element
+  // Append sort controls and grid container to the main content element
+  mainContentElement.appendChild(sortControlsContainer);
   mainContentElement.appendChild(gridContainer);
 
   // Update bookmark icons after displaying results
@@ -573,7 +626,7 @@ function createVideoCard(video) {
             <!-- End Thumbnail Hover Icons -->
         </div>
         <div class="p-3">
-            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${videoTitle}</h3>
+            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10" title="${videoTitle.replace(/"/g, '&quot;')}">${videoTitle}</h3>
             <div class="flex items-center mt-1">
                 <a href="${channelId ? `/channel/${channelId}` : '#'}" class="flex-shrink-0 mr-2" onclick="event.stopPropagation();">
                     <img src="${channelAvatarUrl}" alt="${channelNameText} avatar" class="w-8 h-8 rounded-full">

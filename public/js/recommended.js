@@ -87,7 +87,7 @@ function createRecommendedVideoCard(video) {
         <!-- End Thumbnail Hover Icons -->
       </div>
       <div class="recommended-details flex flex-col justify-start overflow-hidden">
-        <h4 class="recommended-title text-sm font-medium text-zinc-100 line-clamp-2 mb-1">${videoTitle}</h4>
+        <h4 class="recommended-title text-sm font-medium text-zinc-100 line-clamp-2 mb-1" title="${videoTitle.replace(/"/g, '&quot;')}">${videoTitle}</h4>
         <div class="recommended-channel flex items-center text-xs text-zinc-400 truncate mb-0.5">
           <a href="${channelId ? `/channel/${channelId}` : '#'}" class="flex-shrink-0 mr-1.5" onclick="event.stopPropagation();">
             <img src="${channelAvatarUrl}" alt="${channelNameText} avatar" class="w-5 h-5 rounded-full">

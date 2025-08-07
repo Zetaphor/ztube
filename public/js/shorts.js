@@ -220,7 +220,7 @@ function createShortCard(short) {
       </div>
     </div>
     <div class="p-2">
-      <h3 class="font-semibold text-zinc-100 text-sm line-clamp-2 mb-1 h-8">${shortTitle}</h3>
+      <h3 class="font-semibold text-zinc-100 text-sm line-clamp-2 mb-1 h-8" title="${shortTitle.replace(/"/g, '&quot;')}">${shortTitle}</h3>
       <div class="flex items-start text-xs text-zinc-400">
         <img src="${channelAvatarUrl}" alt="${channelNameText}" class="w-4 h-4 rounded-full mr-1 flex-shrink-0">
         <div class="flex flex-col">

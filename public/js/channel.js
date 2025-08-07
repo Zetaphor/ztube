@@ -98,7 +98,7 @@ function createVideoCard(video) {
             <!-- End Thumbnail Hover Icons -->
         </div>
         <div class="p-3">
-            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10">${videoTitle}</h3>
+            <h3 class="font-semibold text-zinc-100 line-clamp-2 mb-2 text-sm h-10" title="${videoTitle.replace(/"/g, '&quot;')}">${videoTitle}</h3>
             <div class="flex items-center mt-1">
                 <!-- Hide avatar/channel name inside the card when on channel page -->
                 <!--

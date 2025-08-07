@@ -38,7 +38,7 @@ router.get('/trending', async (req, res) => {
           thumbnails: video.thumbnails || [],
           channel: {
             name: video.author?.name || 'Unknown',
-            avatar: video.author?.thumbnails || [],
+            avatar: video.author?.thumbnails || [{ url: '/img/default-avatar.svg', width: 48, height: 48 }],
             verified: video.author?.is_verified || false,
             id: video.author?.id || null
           }
@@ -183,9 +183,19 @@ router.get('/:id', async (req, res) => {
       author: {
         id: video.basic_info.channel?.id,
         name: video.basic_info.channel?.name?.text || video.basic_info.channel?.name,
-        thumbnails: Array.isArray(video.basic_info.channel?.thumbnails) && video.basic_info.channel.thumbnails.length > 0
-          ? video.basic_info.channel.thumbnails
-          : [{ url: '/img/default-avatar.svg', width: 48, height: 48 }],
+        thumbnails: (() => {
+          // Try multiple paths for channel thumbnails
+          const basicThumbnails = video.basic_info.channel?.thumbnails;
+          const ownerThumbnails = video.secondary_info?.owner?.author?.thumbnails;
+
+          if (Array.isArray(basicThumbnails) && basicThumbnails.length > 0) {
+            return basicThumbnails;
+          } else if (Array.isArray(ownerThumbnails) && ownerThumbnails.length > 0) {
+            return ownerThumbnails;
+          } else {
+            return [{ url: '/img/default-avatar.svg', width: 48, height: 48 }];
+          }
+        })(),
         subscriber_count: video.basic_info.channel?.subscriber_count?.text || video.basic_info.channel?.subscriber_count || '',
         verified: video.basic_info.channel?.is_verified
       },
@@ -303,7 +313,7 @@ router.get('/:id/recommendations', async (req, res) => {
             thumbnails: video.thumbnails || [],
             channel: {
               name: video.author?.name || video.channel?.name || 'Unknown',
-              avatar: video.author?.thumbnails || video.channel?.thumbnails || [],
+              avatar: video.author?.thumbnails || video.channel?.thumbnails || [{ url: '/img/default-avatar.svg', width: 48, height: 48 }],
               verified: video.author?.is_verified || video.channel?.is_verified || false,
               id: video.author?.id || video.channel?.id || null
             }
@@ -342,7 +352,7 @@ router.get('/:id/recommendations', async (req, res) => {
                 thumbnails: video.thumbnails || [],
                 channel: {
                   name: video.author?.name || 'Unknown',
-                  avatar: video.author?.thumbnails || [],
+                  avatar: video.author?.thumbnails || [{ url: '/img/default-avatar.svg', width: 48, height: 48 }],
                   verified: video.author?.is_verified || false,
                   id: video.author?.id || null
                 }
