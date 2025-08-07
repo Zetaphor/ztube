@@ -6,16 +6,60 @@ const fs = require('fs');
 // Keep a global reference of the window object to avoid garbage collection
 let mainWindow;
 let serverProcess;
+let pendingUrl = null; // Store URL if app isn't ready yet
 
 // Check if in development mode
 const isDev = process.env.ELECTRON_DEV === 'true';
 
 // Helper function to extract YouTube Video ID
 function extractVideoId(url) {
+  // Handle freetube:// protocol URLs from LibRedirect
+  if (url.startsWith('freetube://')) {
+    // Remove the freetube:// prefix to get the actual content
+    const actualUrl = url.replace('freetube://', '');
+
+    // Check if it's a direct video ID (11 characters alphanumeric)
+    const videoIdMatch = actualUrl.match(/^([a-zA-Z0-9_-]{11})$/);
+    if (videoIdMatch) {
+      return videoIdMatch[1];
+    }
+
+    // Otherwise, treat it as a YouTube URL (with or without protocol)
+    const fullUrl = actualUrl.startsWith('http') ? actualUrl : `https://${actualUrl}`;
+
+    // Recursively call extractVideoId with the cleaned URL
+    return extractVideoId(fullUrl);
+  }
+
   // Regex to capture video ID from various YouTube URL formats
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/;
   const match = url.match(regex);
   return match ? match[1] : null;
+}
+
+// Handle URLs passed to the application
+function handleUrl(url) {
+  console.log(`[Main Process] Handling URL: ${url}`);
+
+  // Extract video ID from the URL
+  const videoId = extractVideoId(url);
+
+  if (videoId) {
+    console.log(`[Main Process] Extracted video ID: ${videoId}`);
+
+    if (mainWindow && mainWindow.webContents) {
+      // If window is ready, send video ID directly
+      console.log(`[Main Process] Sending IPC message 'load-video-from-main' with videoId: ${videoId}`);
+      mainWindow.webContents.send('load-video-from-main', videoId);
+      console.log(`[Main Process] IPC message sent successfully`);
+    } else {
+      console.log(`[Main Process] Window not ready, storing URL for later: ${url}`);
+      // Store URL for when window is ready
+      pendingUrl = url;
+    }
+  } else {
+    console.warn(`[Main Process] Could not extract video ID from URL: ${url}`);
+  }
 }
 
 // Start the Express server as a separate Node.js process
@@ -137,23 +181,65 @@ function createWindow() {
     mainWindow = null;
   });
 
+  // Handle any pending URL that was passed before window was ready
+  if (pendingUrl) {
+    setTimeout(() => {
+      handleUrl(pendingUrl);
+      pendingUrl = null;
+    }, 4000); // Wait longer for the app to fully load and IPC listener to be set up
+  }
+
   // Set the application menu (optional)
   // You can uncomment and customize this if needed
   // const menu = Menu.buildFromTemplate(menuTemplate);
   // Menu.setApplicationMenu(menu);
 }
 
-// Initialize app
-app.whenReady().then(() => {
-  startServer();
-  createWindow();
+// Make app single instance
+const gotTheLock = app.requestSingleInstanceLock();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  // Handle second instance (when app is already running and user opens another URL)
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, focus our window instead and handle the URL
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+
+    // Handle URL from command line arguments (http or freetube protocol)
+    const url = commandLine.find(arg => arg.startsWith('http') || arg.startsWith('freetube://'));
+    if (url) {
+      handleUrl(url);
     }
   });
-});
+
+  // Handle URLs on macOS
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    handleUrl(url);
+  });
+
+  // Initialize app
+  app.whenReady().then(() => {
+    // Handle URL from command line arguments on first launch (http or freetube protocol)
+    const url = process.argv.find(arg => arg.startsWith('http') || arg.startsWith('freetube://'));
+    if (url) {
+      pendingUrl = url;
+    }
+
+    startServer();
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {

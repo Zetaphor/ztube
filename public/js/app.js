@@ -54,20 +54,29 @@ function updateBookmarkIconState(cardElement) {
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null
 window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, skipHistory = false) {
+  console.log(`loadAndDisplayVideo called with videoId: ${videoId}, skipHistory: ${skipHistory}`);
+
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get the main player container
   const mainContentContainer = document.querySelector('#main-content > main'); // The <main> element in all pages
 
+  console.log('Elements found:');
+  console.log('- videoPlayerContainer:', videoPlayerContainer);
+  console.log('- mainContentContainer:', mainContentContainer);
+
   if (!videoPlayerContainer) {
+    console.error('Video player container not found!');
     showError('Video player container not found.');
     return;
   }
 
   if (!mainContentContainer) {
+    console.error('Main content container not found!');
     showError('Could not find the main content area (#main-content > main) to hide.');
     return; // Stop if we can't hide the main content
   }
 
   try {
+    console.log('Starting video load process...');
     showLoading();
     currentVideoId = videoId;
 
@@ -83,13 +92,18 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, s
           videoId: videoId,
           previousUrl: window.location.href
         }, '', newUrl.toString());
+        console.log('Updated URL to:', newUrl.toString());
       }
     }
 
     // Hide the main content container
+    console.log('Hiding main content, showing video player...');
     mainContentContainer.classList.add('hidden');
-
     videoPlayerContainer.classList.remove('hidden');
+
+    console.log('UI state after changes:');
+    console.log('- mainContentContainer.classList:', mainContentContainer.classList.toString());
+    console.log('- videoPlayerContainer.classList:', videoPlayerContainer.classList.toString());
 
     // --- Get and display date from card immediately ---
     const uploadedDateFromCard = videoCardElement?.dataset?.uploadedat;
@@ -749,6 +763,48 @@ window.addEventListener('popstate', (event) => {
   }
 });
 
+// Set up IPC listener immediately when script loads
+console.log('Setting up IPC listener for video load requests (early setup)');
+if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
+  window.electronAPI.onVideoLoadRequest((videoId) => {
+    console.info(`app.js: IPC Listener CALLBACK triggered with videoId: ${videoId}`);
+    if (videoId && typeof videoId === 'string') {
+      console.info(`app.js: Calling window.loadAndDisplayVideo via IPC with ID: ${videoId}`);
+      console.log('DOM elements check:');
+      console.log('- videoPlayer container:', document.getElementById('videoPlayer'));
+      console.log('- main content container:', document.querySelector('#main-content > main'));
+
+      // Wait for DOM to be ready if it's not already
+      if (document.readyState === 'loading') {
+        console.log('DOM not ready yet, waiting for DOMContentLoaded...');
+        document.addEventListener('DOMContentLoaded', () => {
+          console.log('DOM now ready, loading video...');
+          try {
+            window.loadAndDisplayVideo(videoId, null);
+          } catch (error) {
+            console.error(`app.js: Error calling window.loadAndDisplayVideo for ID ${videoId} via IPC (delayed):`, error);
+            showError(`Failed to load video (IPC): ${error.message}`);
+          }
+        });
+      } else {
+        console.log('DOM already ready, loading video immediately...');
+        try {
+          // Call the global function, passing null for the element
+          window.loadAndDisplayVideo(videoId, null);
+        } catch (error) {
+          console.error(`app.js: Error calling window.loadAndDisplayVideo for ID ${videoId} via IPC:`, error);
+          showError(`Failed to load video (IPC): ${error.message}`);
+        }
+      }
+    } else {
+      console.error('app.js: Received invalid video ID via IPC:', videoId);
+      showError(`Received invalid video ID via IPC: ${videoId}`);
+    }
+  });
+} else {
+  console.warn('app.js: electronAPI or onVideoLoadRequest not found. IPC listener not set up.');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const queryParam = urlParams.get('query');
@@ -765,28 +821,6 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (content && window.location.pathname === '/') {
     // Only load trending videos on the main index page
     loadTrendingVideos();
-  }
-
-  // Add IPC Listener (Remains in app.js)
-  if (window.electronAPI && typeof window.electronAPI.onVideoLoadRequest === 'function') {
-    window.electronAPI.onVideoLoadRequest((videoId) => {
-      console.info(`app.js: IPC Listener CALLBACK triggered with videoId: ${videoId}`);
-      if (videoId && typeof videoId === 'string') {
-        console.info(`app.js: Calling window.loadAndDisplayVideo via IPC with ID: ${videoId}`);
-        try {
-          // Call the global function, passing null for the element
-          window.loadAndDisplayVideo(videoId, null);
-        } catch (error) {
-          console.error(`app.js: Error calling window.loadAndDisplayVideo for ID ${videoId} via IPC:`, error);
-          showError(`Failed to load video (IPC): ${error.message}`);
-        }
-      } else {
-        console.error('app.js: Received invalid video ID via IPC:', videoId);
-        showError(`Received invalid video ID via IPC: ${videoId}`);
-      }
-    });
-  } else {
-    console.warn('app.js: electronAPI or onVideoLoadRequest not found. IPC listener not set up.');
   }
 
   // --- Event Listener for Updating Bookmark Icons ---

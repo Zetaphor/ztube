@@ -3,7 +3,10 @@
   <ul class="flex flex-col items-center space-y-4 mt-4">
     <li class="mb-2"><a href="/"
         class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'home') ? 'text-green-500' : '' %>"><i
-          class="fas fa-bookmark"></i></a></li>
+          class="fas fa-home"></i></a></li>
+    <li class="mb-2"><a href="/subscriptions"
+        class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'subscriptions') ? 'text-green-500' : '' %>"><i
+          class="fas fa-heart"></i></a></li>
     <li class="mb-2"><a href="/shorts"
         class="hover:text-green-400 text-2xl <%= (typeof activePage !== 'undefined' && activePage === 'shorts') ? 'text-green-500' : '' %>"><i
           class="fas fa-play"></i></a></li>

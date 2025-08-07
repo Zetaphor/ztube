@@ -61,10 +61,17 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "desktop": {
+        "Name": "ZTube",
+        "GenericName": "YouTube Player",
+        "Comment": "A full-featured YouTube client built with privacy in mind",
+        "MimeType": "x-scheme-handler/freetube;",
+        "Categories": "Network;AudioVideo;",
+        "StartupWMClass": "ZTube"
+      }
     },
     "win": {
       "target": [

@@ -1,5 +1,11 @@
 # ZTube
 
+A full-featured YouTube client built with privacy in mind.
+
+## LibRedirect Integration
+
+ZTube supports integration with the LibRedirect browser extension, allowing you to automatically open YouTube links in ZTube instead of your browser. See [LIBREDIRECT_SETUP.md](LIBREDIRECT_SETUP.md) for detailed setup instructions.
+
 ## FreeTube Data Import
 
 ### Import subscriptions (FreeTube CSV export)

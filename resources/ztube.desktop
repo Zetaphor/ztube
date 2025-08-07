@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=ZTube
+GenericName=YouTube Player
+Comment=A full-featured YouTube client built with privacy in mind
+Exec=ztube %U
+Terminal=false
+Type=Application
+Icon=ztube
+MimeType=x-scheme-handler/freetube;
+Categories=Network;AudioVideo;
+StartupWMClass=ZTube

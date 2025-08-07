@@ -40,6 +40,11 @@ app.set('view engine', 'ejs');
 app.set('views', join(__dirname, '../views'));
 
 app.get('/', (req, res) => {
+  res.render('index');
+});
+
+// Route for subscriptions page
+app.get('/subscriptions', (req, res) => {
   res.render('subscriptions');
 });
 
