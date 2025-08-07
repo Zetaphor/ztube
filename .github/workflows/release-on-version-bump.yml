@@ -1,0 +1,80 @@
+name: Release Linux AppImage on version bump
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "package.json"
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine if version changed
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_version=$(jq -r '.version' package.json)
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            prev_version=$(git show HEAD~1:package.json | jq -r '.version' 2>/dev/null || echo "")
+          else
+            prev_version=""
+          fi
+          echo "Current: $current_version"
+          echo "Previous: $prev_version"
+          if [ -n "$current_version" ] && [ "$current_version" != "$prev_version" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$current_version" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: detect
+    if: needs.detect.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux AppImage
+        run: npm run build:linux
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          ELECTRON_BUILDER_SKIP_UPDATE: "true"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-${{ needs.detect.outputs.version }}
+          path: dist/*.AppImage
+          if-no-files-found: error
+
+      - name: Create GitHub Release and upload AppImage
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.detect.outputs.version }}
+          name: ZTube v${{ needs.detect.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/*.AppImage
