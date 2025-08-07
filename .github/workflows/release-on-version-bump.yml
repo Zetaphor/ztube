@@ -40,10 +40,22 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-  release:
+  build:
     needs: detect
     if: needs.detect.outputs.changed == 'true'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            build_cmd: npm run build:linux -- -p never
+            artifact_name: linux
+            upload_path: dist/*.AppImage
+          - os: windows-latest
+            build_cmd: npm run build:win -- -p never
+            artifact_name: windows
+            upload_path: dist/*.exe
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,8 +69,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Linux AppImage
-        run: npm run build:linux -- -p never
+      - name: Build
+        run: ${{ matrix.build_cmd }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           ELECTRON_BUILDER_SKIP_UPDATE: "true"
@@ -66,15 +78,35 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: appimage-${{ needs.detect.outputs.version }}
-          path: dist/*.AppImage
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.upload_path }}
           if-no-files-found: error
 
-      - name: Create GitHub Release and upload AppImage
+  publish_release:
+    needs: [detect, build]
+    if: needs.detect.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: artifacts/linux
+          merge-multiple: false
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: artifacts/windows
+          merge-multiple: false
+
+      - name: Create or update GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.detect.outputs.version }}
           name: ZTube v${{ needs.detect.outputs.version }}
           generate_release_notes: true
           files: |
-            dist/*.AppImage
+            artifacts/linux/*.AppImage
+            artifacts/windows/*.exe
