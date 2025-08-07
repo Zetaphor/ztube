@@ -367,6 +367,8 @@ window.onYouTubeIframeAPIReady = function () {
 // Global variable to store current search query and sort
 let currentSearchQuery = '';
 let currentSortBy = 'newest'; // Default to newest first
+let currentSearchId = null; // For infinite scroll (stores search object ID)
+let isLoadingSearchResults = false; // Prevent multiple simultaneous loads
 
 // Search Functions
 async function performSearch(sortBy = null) {
@@ -377,6 +379,16 @@ async function performSearch(sortBy = null) {
   currentSearchQuery = query;
   if (sortBy !== null) {
     currentSortBy = sortBy;
+  }
+
+  // Reset search state for new search
+  currentSearchId = null;
+  isLoadingSearchResults = false;
+
+  // Clean up existing infinite scroll observer
+  if (searchScrollObserver) {
+    searchScrollObserver.disconnect();
+    searchScrollObserver = null;
   }
 
   const videoPlayerContainer = document.getElementById('videoPlayer'); // Get player container
@@ -399,8 +411,16 @@ async function performSearch(sortBy = null) {
         throw new Error(errorData.error || `Search failed: ${response.status}`);
       }
       const data = await response.json();
+
+      // Store search ID for infinite scroll
+      currentSearchId = data.searchId;
+
       // Display results within the main content area
-      displayResults(data, mainContentArea);
+      displayResults(data.videos || data, mainContentArea);
+
+      // Set up infinite scroll for search results
+      setupSearchInfiniteScroll(mainContentArea);
+
       // Update bookmark icons after displaying results
       document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
       // Process newly displayed cards for watch history
@@ -429,6 +449,116 @@ async function performSearchWithSort(sortBy) {
   }
 
   await performSearch(sortBy);
+}
+
+// Infinite scroll functions for search results
+let searchScrollObserver = null;
+
+function setupSearchInfiniteScroll(mainContentArea) {
+  // Clean up any existing observer
+  if (searchScrollObserver) {
+    searchScrollObserver.disconnect();
+  }
+
+  // Only set up infinite scroll if we have a search ID
+  if (!currentSearchId) {
+    console.log('No search ID - infinite scroll not enabled');
+    return;
+  }
+
+  // Create or find sentinel element
+  let sentinel = document.getElementById('search-scroll-sentinel');
+  if (!sentinel) {
+    sentinel = document.createElement('div');
+    sentinel.id = 'search-scroll-sentinel';
+    sentinel.className = 'col-span-full h-20 flex items-center justify-center';
+    sentinel.innerHTML = '<div class="text-zinc-500 text-sm">Loading more results...</div>';
+
+    // Add sentinel to the grid container
+    const gridContainer = mainContentArea.querySelector('#content');
+    if (gridContainer) {
+      gridContainer.appendChild(sentinel);
+    }
+  }
+
+  // Set up intersection observer
+  searchScrollObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && currentSearchId && !isLoadingSearchResults) {
+        loadMoreSearchResults();
+      }
+    });
+  }, {
+    root: null,
+    rootMargin: '100px',
+    threshold: 0.1
+  });
+
+  searchScrollObserver.observe(sentinel);
+  console.log('Search infinite scroll enabled');
+}
+
+async function loadMoreSearchResults() {
+  if (!currentSearchId || isLoadingSearchResults || !currentSearchQuery) {
+    return;
+  }
+
+  isLoadingSearchResults = true;
+
+  try {
+    console.log('Loading more search results...');
+    const response = await fetch(`/api/search?query=${encodeURIComponent(currentSearchQuery)}&sort=${currentSortBy}&searchId=${encodeURIComponent(currentSearchId)}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to load more results');
+    }
+
+    const data = await response.json();
+    const newVideos = data.videos || data;
+
+    // Update search ID
+    currentSearchId = data.searchId;
+
+    // Append new videos to existing grid
+    const gridContainer = document.querySelector('#main-content > main #content');
+    const sentinel = document.getElementById('search-scroll-sentinel');
+
+    if (gridContainer && newVideos.length > 0) {
+      newVideos.forEach(video => {
+        const card = createVideoCard(video);
+        // Insert before sentinel
+        if (sentinel) {
+          gridContainer.insertBefore(card, sentinel);
+        } else {
+          gridContainer.appendChild(card);
+        }
+      });
+
+      // Update bookmark icons and watch history for new cards
+      document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
+      const newCards = gridContainer.querySelectorAll('.video-card:not([data-processed])');
+      processCardsForWatchHistory(newCards);
+
+      console.log(`Loaded ${newVideos.length} more search results`);
+    }
+
+    // If no search ID, we've reached the end
+    if (!currentSearchId && sentinel) {
+      sentinel.innerHTML = '<div class="text-zinc-500 text-sm"><i class="fas fa-check-circle mr-2"></i>End of search results</div>';
+      if (searchScrollObserver) {
+        searchScrollObserver.disconnect();
+      }
+    }
+
+  } catch (error) {
+    console.error('Error loading more search results:', error);
+    const sentinel = document.getElementById('search-scroll-sentinel');
+    if (sentinel) {
+      sentinel.innerHTML = '<div class="text-red-500 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load more results</div>';
+    }
+  } finally {
+    isLoadingSearchResults = false;
+  }
 }
 
 async function loadTrendingVideos() {
@@ -505,8 +635,8 @@ function displayResults(results, mainContentElement) {
   sortOptions.forEach(option => {
     const button = document.createElement('button');
     button.className = `px-3 py-1.5 text-sm rounded-lg transition-colors ${currentSortBy === option.value
-        ? 'bg-green-600 text-white'
-        : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+      ? 'bg-green-600 text-white'
+      : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
       }`;
     button.textContent = option.label;
     button.onclick = () => performSearchWithSort(option.value);
