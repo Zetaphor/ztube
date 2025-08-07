@@ -410,6 +410,52 @@ async function performSearch() {
   }
 }
 
+async function loadTrendingVideos() {
+  const videoPlayerContainer = document.getElementById('videoPlayer'); // Get player container
+
+  // If the player is currently visible, close it first
+  if (videoPlayerContainer && !videoPlayerContainer.classList.contains('hidden')) {
+    closeVideoPlayer();
+  }
+
+  // --- Find the main content area --- a <main> tag inside #main-content
+  const mainContentArea = document.querySelector('#main-content > main');
+  // --- End Find Main Area ---
+
+  if (mainContentArea) {
+    try {
+      showLoading();
+      console.log('Loading trending videos for main feed...');
+
+      const response = await fetch('/api/video/trending');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to load trending videos: ${response.status}`);
+      }
+      const trendingVideos = await response.json();
+
+      // Display results within the main content area
+      displayResults(trendingVideos, mainContentArea);
+      // Update bookmark icons after displaying results
+      document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
+      // Process newly displayed cards for watch history
+      processCardsForWatchHistory(mainContentArea.querySelectorAll('.video-card'));
+
+      console.log(`✅ Loaded ${trendingVideos.length} trending videos (shorts filtered out)`);
+
+    } catch (error) {
+      console.error('Trending videos error:', error);
+      // Display error within the main content area, replacing its content
+      mainContentArea.innerHTML = `<div class="col-span-full text-center py-10 text-red-600">${error.message || 'Failed to load trending videos. Please try again.'}</div>`;
+      showError(error.message || 'Failed to load trending videos. Please try again.');
+    } finally {
+      hideLoading();
+    }
+  } else {
+    console.warn("Could not find the main content area (#main-content > main) for trending videos.");
+  }
+}
+
 function displayResults(results, mainContentElement) {
   // Clear the main content element
   mainContentElement.innerHTML = '';
@@ -452,6 +498,7 @@ function createVideoCard(video) {
   let uploadedAt = video.uploadedAt || '';
   const videoTitle = video.title || 'Untitled';
   const channelNameText = video.channel?.name || 'Unknown';
+  const channelId = video.channel?.id;
 
   card.dataset.videoId = video.id;
   card.dataset.uploadedat = uploadedAt;
@@ -468,8 +515,6 @@ function createVideoCard(video) {
   }
 
   card.onclick = () => window.loadAndDisplayVideo(video.id, card);
-
-  const channelId = video.channel?.id;
   const verifiedBadge = video.channel?.verified ?
     '<i class="fas fa-check-circle text-green-500 ml-1 text-xs" title="Verified Channel"></i>' :
     '';
@@ -717,9 +762,9 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (queryParam && searchInput && content) {
     searchInput.value = queryParam;
     performSearch();
-  } else {
-    // If no search query, maybe update icons for initially loaded content (if any)
-    document.dispatchEvent(new Event('uiNeedsBookmarkUpdate'));
+  } else if (content && window.location.pathname === '/') {
+    // Only load trending videos on the main index page
+    loadTrendingVideos();
   }
 
   // Add IPC Listener (Remains in app.js)

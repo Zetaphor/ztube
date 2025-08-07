@@ -38,6 +38,7 @@ router.get('/', async (req, res) => {
     // Check if we should separate videos and Shorts or filter for Shorts only
     const filterShorts = req.query.shorts_only === 'true';
     const separateContent = req.query.separate === 'true';
+    const filterOutShorts = req.query.filter_shorts === 'false'; // Default is to filter out shorts
 
     if (filterShorts) {
       const { shorts } = separateVideosAndShorts(filteredVideos);
@@ -45,6 +46,10 @@ router.get('/', async (req, res) => {
     } else if (separateContent) {
       const separated = separateVideosAndShorts(filteredVideos);
       res.json(separated);
+    } else if (filterOutShorts !== false) { // Default behavior: filter out shorts
+      const { videos } = separateVideosAndShorts(filteredVideos);
+      console.log(`🎬 SEARCH FILTERED SHORTS: Showing ${videos.length} regular videos (${filteredVideos.length - videos.length} shorts filtered out)`);
+      res.json(videos);
     } else {
       res.json(filteredVideos);
     }

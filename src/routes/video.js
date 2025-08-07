@@ -3,8 +3,112 @@ import { YTNodes } from 'youtubei.js';
 import getYoutubeClient from '../utils/youtubeClient.js';
 import { formatViewCount, formatDuration } from '../utils/formatters.js';
 import { filterBlockedChannels } from '../utils/contentFilter.js';
+import { separateVideosAndShorts } from '../utils/shortsDetection.js';
 
 const router = express.Router();
+
+// Get trending/home feed videos (filtered to exclude shorts by default)
+router.get('/trending', async (req, res) => {
+  const youtube = await getYoutubeClient();
+  try {
+    console.log('=== FETCHING TRENDING VIDEOS ===');
+
+    let videos = [];
+
+    try {
+      // Try to get trending videos from YouTube
+      // Use popular search terms since empty query doesn't work
+      const popularTerms = ['music', 'gaming', 'news', 'entertainment', 'technology', 'sports'];
+      const randomTerm = popularTerms[Math.floor(Math.random() * popularTerms.length)];
+
+      const trendingResults = await youtube.search(randomTerm, {
+        type: 'video',
+        sort_by: 'relevance',
+        upload_date: 'week' // Focus on recent content
+      });
+
+      if (trendingResults && trendingResults.videos) {
+        videos = trendingResults.videos.map(video => ({
+          id: video.id,
+          title: video.title?.text || video.title || 'Untitled',
+          duration: video.duration?.text || '0:00',
+          durationSeconds: video.duration?.seconds || 0,
+          viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+          uploadedAt: video.published?.text || 'Unknown date',
+          thumbnails: video.thumbnails || [],
+          channel: {
+            name: video.author?.name || 'Unknown',
+            avatar: video.author?.thumbnails || [],
+            verified: video.author?.is_verified || false,
+            id: video.author?.id || null
+          }
+        }));
+
+        console.log(`✅ TRENDING SUCCESS: Found ${videos.length} trending videos using search term "${randomTerm}"`);
+      }
+    } catch (trendingError) {
+      console.warn('❌ TRENDING METHOD FAILED:', trendingError.message);
+
+      // Fallback: try generic popular searches
+      try {
+        const fallbackTerms = ['popular', 'trending', 'viral', 'latest', 'music', 'gaming', 'technology'];
+        const randomTerm = fallbackTerms[Math.floor(Math.random() * fallbackTerms.length)];
+
+        const fallbackResults = await youtube.search(randomTerm, {
+          type: 'video',
+          duration: 'medium' // Avoid shorts, get medium-length videos
+        });
+
+        if (fallbackResults && fallbackResults.videos) {
+          videos = fallbackResults.videos.slice(0, 30).map(video => ({
+            id: video.id,
+            title: video.title?.text || video.title || 'Untitled',
+            duration: video.duration?.text || '0:00',
+            durationSeconds: video.duration?.seconds || 0,
+            viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+            uploadedAt: video.published?.text || 'Unknown date',
+            thumbnails: video.thumbnails || [],
+            channel: {
+              name: video.author?.name || 'Unknown',
+              avatar: video.author?.thumbnails || [],
+              verified: video.author?.is_verified || false,
+              id: video.author?.id || null
+            }
+          }));
+
+          console.log(`✅ FALLBACK SUCCESS: Found ${videos.length} videos using search term "${randomTerm}"`);
+        }
+      } catch (fallbackError) {
+        console.error('❌ FALLBACK METHOD ALSO FAILED:', fallbackError.message);
+        throw new Error('Failed to fetch trending videos');
+      }
+    }
+
+    // Filter out videos from blocked channels
+    const filteredVideos = await filterBlockedChannels(videos);
+    console.log(`🔒 FILTERED: ${videos.length - filteredVideos.length} videos removed from blocked channels`);
+
+    // Check if we should separate videos and Shorts or filter out shorts
+    const separateContent = req.query.separate === 'true';
+    const filterOutShorts = req.query.filter_shorts === 'false'; // Default is to filter out shorts
+
+    if (separateContent) {
+      const separated = separateVideosAndShorts(filteredVideos);
+      console.log(`📱 SEPARATED TRENDING: ${separated.videos.length} regular videos, ${separated.shorts.length} shorts`);
+      res.json(separated);
+    } else if (filterOutShorts !== false) { // Default behavior: filter out shorts
+      const { videos: regularVideos } = separateVideosAndShorts(filteredVideos);
+      console.log(`🎬 FILTERED SHORTS FROM TRENDING: Showing ${regularVideos.length} regular videos (${filteredVideos.length - regularVideos.length} shorts filtered out)`);
+      res.json(regularVideos);
+    } else {
+      res.json(filteredVideos);
+    }
+
+  } catch (error) {
+    console.error('Trending videos error:', error);
+    res.status(500).json({ error: `Failed to retrieve trending videos: ${error.message}` });
+  }
+});
 
 // Get video details
 router.get('/:id', async (req, res) => {
@@ -271,7 +375,21 @@ router.get('/:id/recommendations', async (req, res) => {
     const filteredRecommendations = await filterBlockedChannels(recommendations);
     console.log(`🔒 FILTERED: ${recommendations.length - filteredRecommendations.length} recommendations removed from blocked channels`);
 
-    res.json(filteredRecommendations);
+    // Check if we should separate videos and Shorts or filter out shorts
+    const separateContent = req.query.separate === 'true';
+    const filterOutShorts = req.query.filter_shorts === 'false'; // Default is to filter out shorts
+
+    if (separateContent) {
+      const separated = separateVideosAndShorts(filteredRecommendations);
+      console.log(`📱 SEPARATED: ${separated.videos.length} regular videos, ${separated.shorts.length} shorts`);
+      res.json(separated);
+    } else if (filterOutShorts !== false) { // Default behavior: filter out shorts
+      const { videos } = separateVideosAndShorts(filteredRecommendations);
+      console.log(`🎬 FILTERED SHORTS: Showing ${videos.length} regular videos (${filteredRecommendations.length - videos.length} shorts filtered out)`);
+      res.json(videos);
+    } else {
+      res.json(filteredRecommendations);
+    }
 
   } catch (error) {
     console.error(`Recommendations error for video ${id}:`, error);

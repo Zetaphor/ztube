@@ -6,11 +6,59 @@ import fetch from 'node-fetch';
 import { XMLParser } from 'fast-xml-parser';
 import * as SubscriptionsRepo from '../db/subscriptionsRepository.js';
 import getYoutubeClient from '../utils/youtubeClient.js';
-import { formatViewCount, formatRelativeDate } from '../utils/formatters.js';
+import { formatViewCount, formatRelativeDate, formatDuration } from '../utils/formatters.js';
 import { separateVideosAndShorts } from '../utils/shortsDetection.js';
 import { filterBlockedChannels } from '../utils/contentFilter.js';
 
 const router = express.Router();
+
+/**
+ * Enhance videos with duration data from YouTube API for better shorts detection
+ * @param {Array} videos - Array of video objects from RSS feeds
+ * @param {Object} youtube - YouTube client instance
+ * @returns {Promise<Array>} Enhanced video objects with duration data
+ */
+async function enhanceVideosWithDuration(videos, youtube) {
+  console.log(`🔍 Enhancing ${videos.length} videos with duration data for shorts detection...`);
+
+  const enhancedVideos = await Promise.all(videos.map(async (video) => {
+    try {
+      // Fetch video info to get duration
+      const videoInfo = await youtube.getInfo(video.id);
+      const duration = videoInfo.basic_info?.duration;
+
+      if (duration && typeof duration === 'object') {
+        // Extract duration in seconds
+        const durationSeconds = duration.seconds_total || duration.seconds || 0;
+        const durationText = duration.text || formatDuration(durationSeconds);
+
+        return {
+          ...video,
+          duration: durationText,
+          durationSeconds: durationSeconds
+        };
+      } else if (typeof duration === 'number') {
+        return {
+          ...video,
+          duration: formatDuration(duration),
+          durationSeconds: duration
+        };
+      } else {
+        // Keep original video if duration fetch fails
+        return video;
+      }
+    } catch (error) {
+      console.warn(`Failed to fetch duration for video ${video.id}:`, error.message);
+      // Return original video if API call fails
+      return video;
+    }
+  }));
+
+  const enhancedCount = enhancedVideos.filter(v => v.durationSeconds > 0).length;
+  console.log(`✅ Enhanced ${enhancedCount}/${videos.length} videos with duration data`);
+
+  return enhancedVideos;
+}
 
 // Multer configuration for handling CSV uploads in memory
 const storage = multer.memoryStorage();
@@ -301,7 +349,12 @@ router.get('/feed', async (req, res) => {
     // Check if we should separate videos and Shorts
     const separateContent = req.query.separate === 'true';
     if (separateContent) {
-      const separated = separateVideosAndShorts(filteredVideos);
+      // Enhanced shorts detection for subscription feeds
+      // Since RSS feeds don't include duration, we'll fetch it for recent videos
+      const youtube = await getYoutubeClient();
+      const enhancedVideos = await enhanceVideosWithDuration(filteredVideos.slice(0, 50), youtube);
+      const separated = separateVideosAndShorts(enhancedVideos);
+      console.log(`📱 SUBSCRIPTION SEPARATION: ${separated.videos.length} regular videos, ${separated.shorts.length} shorts detected`);
       res.json(separated);
     } else {
       res.json(filteredVideos);
