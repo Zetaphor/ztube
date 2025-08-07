@@ -58,7 +58,7 @@ jobs:
         run: npm ci
 
       - name: Build Linux AppImage
-        run: npm run build:linux
+        run: npm run build:linux -- -p never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           ELECTRON_BUILDER_SKIP_UPDATE: "true"
