@@ -45,7 +45,7 @@ const CACHE_KEY = 'subscriptionsFeedCache';
 const CACHE_EXPIRY_MINUTES = 30; // 30 minutes
 
 // --- Lazy Loading Variables ---
-const VIDEOS_PER_PAGE = 25; // Number of videos to load per batch
+const VIDEOS_PER_PAGE = 25; // Number of videos to load per batch for display
 let allFetchedVideos = []; // Store all videos fetched from API or cache
 let currentVideoIndex = 0; // Index of the next video to display
 let observer = null; // Intersection Observer instance
@@ -115,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
           console.info(`Loaded ${videos.length} videos and ${shorts.length} shorts from valid cache.`);
           allFetchedVideos = videos;
           window.allFetchedShorts = shorts;
+
+          // RSS feeds don't support pagination - all content is loaded at once
 
           // ---> Clear app.js cache for these specific IDs before processing <---
           const cachedVideoIds = allFetchedVideos.map(v => v.id).filter(Boolean);
@@ -209,9 +211,15 @@ async function loadSubscriptionFeed(forceFetch = false, dueToStaleCache = false)
     return;
   }
 
+  // Reset state on refresh
+  if (forceFetch) {
+    allFetchedVideos = [];
+    currentVideoIndex = 0;
+  }
+
   // Only show full "Loading..." overlay if it's an initial load without any cache
   // or an explicit refresh *not* caused by stale cache (where we already displayed old data)
-  if (forceFetch && !localStorage.getItem(CACHE_KEY) && !dueToStaleCache) {
+  if ((forceFetch && !localStorage.getItem(CACHE_KEY) && !dueToStaleCache) || (!forceFetch && allFetchedVideos.length === 0)) {
     videosContent.innerHTML = '<p class="col-span-full text-center text-zinc-500 py-8">Loading videos...</p>';
     // Also clear/reset shorts tab if needed
     if (shortsContent) {
@@ -219,7 +227,7 @@ async function loadSubscriptionFeed(forceFetch = false, dueToStaleCache = false)
     }
   }
 
-  // Always show the small loading indicator at the top
+  // Always show the small loading indicator at the top for initial loads
   showLoading();
 
   try {
@@ -422,8 +430,10 @@ function setupIntersectionObserver(totalVideos) {
   const oldSentinel = document.getElementById(sentinelId);
   oldSentinel?.remove();
 
-  // Only add sentinel and observe if there are more videos to load
-  if (currentVideoIndex < totalVideos) {
+  // Only add sentinel and observe if there are more videos to load locally
+  const hasMoreLocalVideos = currentVideoIndex < totalVideos;
+
+  if (hasMoreLocalVideos) {
     const sentinel = document.createElement('div');
     sentinel.id = sentinelId;
     // Add some minimal styling or height if needed for reliable intersection
@@ -432,12 +442,16 @@ function setupIntersectionObserver(totalVideos) {
 
     const options = {
       root: null, // Use the viewport as the root
-      rootMargin: '0px',
+      rootMargin: '100px', // Start loading 100px before the sentinel is visible
       threshold: 0.1 // Trigger when 10% of the sentinel is visible
     };
 
     observer = new IntersectionObserver(handleIntersection, options);
     observer.observe(sentinel);
+
+    console.log(`🔍 Observer setup: ${hasMoreLocalVideos ? 'Local videos available' : 'No local videos'}`);
+  } else {
+    console.log('🔍 Observer not needed: No more content to load');
   }
 }
 
@@ -445,10 +459,28 @@ function setupIntersectionObserver(totalVideos) {
 function handleIntersection(entries, observerInstance) {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
-      console.log('Sentinel intersected, loading more videos...');
-      // Stop observing the current sentinel before loading more
-      // observerInstance.unobserve(entry.target); // Moved sentinel removal to setupIntersectionObserver
-      displaySubscriptionVideos(); // Load the next batch
+      console.log('Sentinel intersected, checking if more content needed...');
+
+      // Check if we need to load more videos from local storage
+      if (currentVideoIndex < allFetchedVideos.length) {
+        console.log('Loading more videos from local storage...');
+        displaySubscriptionVideos(); // Load the next batch from existing data
+      }
+      else {
+        console.log('No more content to load - reached end of subscription feed');
+        // Remove sentinel since there's nothing more to load
+        const sentinel = document.getElementById(sentinelId);
+        if (sentinel) {
+          // Replace sentinel with "end of content" message
+          const endMessage = document.createElement('div');
+          endMessage.className = 'col-span-full text-center text-zinc-500 py-8 text-sm';
+          endMessage.innerHTML = '<i class="fas fa-check-circle mr-2"></i>You\'ve reached the end of your subscription feed';
+          sentinel.parentNode.replaceChild(endMessage, sentinel);
+        }
+        if (observer) {
+          observer.disconnect();
+        }
+      }
     }
   });
 }
