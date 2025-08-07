@@ -139,15 +139,6 @@ router.get('/', async (req, res) => {
       const searchObject = searchObjects.get(searchId);
       try {
         results = await searchObject.getContinuation();
-        console.log('Loaded continuation results:');
-        console.log('Continuation results structure:', {
-          hasVideos: !!results.videos,
-          hasResults: !!results.results,
-          videosLength: results.videos?.length || 0,
-          resultsLength: results.results?.length || 0,
-          resultKeys: Object.keys(results),
-          firstResult: results.results?.[0] || results.videos?.[0]
-        });
       } catch (error) {
         console.warn('Failed to get continuation, starting new search:', error.message);
         // If continuation fails, start a new search
@@ -160,83 +151,32 @@ router.get('/', async (req, res) => {
       results = await youtube.search(query);
       searchObjectId = Date.now().toString(); // Simple ID generation
       searchObjects.set(searchObjectId, results);
-
-      // Debug: Log the actual structure
-      console.log('Started new search:', query);
-      console.log('Search results structure:', {
-        hasVideos: !!results.videos,
-        hasResults: !!results.results,
-        videosLength: results.videos?.length || 0,
-        resultsLength: results.results?.length || 0,
-        resultKeys: Object.keys(results),
-        firstResult: results.results?.[0] || results.videos?.[0]
-      });
     }
 
     // Transform the results - try both results.results and results.videos
     const rawVideos = results.results || results.videos || [];
-    console.log('Raw videos count:', rawVideos.length);
-    console.log('First few node types:', rawVideos.slice(0, 5).map(item => ({
-      type: item.type,
-      constructor: item.constructor?.name,
-      hasId: !!item.id,
-      hasTitle: !!item.title
-    })));
-    console.log('First raw video structure:', rawVideos[0] ? {
-      id: rawVideos[0].id,
-      title: rawVideos[0].title,
-      titleText: rawVideos[0].title?.text,
-      author: rawVideos[0].author,
-      type: rawVideos[0].type,
-      keys: Object.keys(rawVideos[0])
-    } : 'no videos');
 
     const videos = Array.isArray(rawVideos) ? rawVideos
       .filter(item => {
         // Filter for actual video node types based on youtubei.js documentation
         const videoTypes = ['Video', 'CompactVideo', 'GridVideo', 'PlaylistPanelVideo', 'PlaylistVideo', 'ReelItem', 'ShortsLockupView'];
-        const isVideo = videoTypes.includes(item.type) || (item.constructor && videoTypes.includes(item.constructor.name));
-
-        if (!isVideo) {
-          console.log('Filtering out non-video node:', { type: item.type, constructor: item.constructor?.name });
-        }
-
-        return isVideo;
+        return videoTypes.includes(item.type) || (item.constructor && videoTypes.includes(item.constructor.name));
       })
-      .map(video => {
-        const mapped = {
-          id: video.id,
-          title: video.title?.text || video.title || 'Untitled',
-          duration: video.duration?.text || '0:00',
-          durationSeconds: video.duration?.seconds || 0,
-          viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
-          uploadedAt: video.published?.text || 'Unknown date',
-          thumbnails: video.thumbnails || [],
-          channel: {
-            name: video.author?.name || 'Unknown',
-            avatar: video.author?.thumbnails || [],
-            verified: video.author?.is_verified || false,
-            id: video.author?.id || null
-          }
-        };
-
-        if (mapped.title === 'Untitled') {
-          console.log('Found Untitled video:', {
-            type: video.type,
-            constructor: video.constructor?.name,
-            id: video.id,
-            rawTitle: video.title,
-            titleText: video.title?.text,
-            titleString: video.title?.toString?.(),
-            videoKeys: Object.keys(video)
-          });
+      .map(video => ({
+        id: video.id,
+        title: video.title?.text || video.title || 'Untitled',
+        duration: video.duration?.text || '0:00',
+        durationSeconds: video.duration?.seconds || 0,
+        viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+        uploadedAt: video.published?.text || 'Unknown date',
+        thumbnails: video.thumbnails || [],
+        channel: {
+          name: video.author?.name || 'Unknown',
+          avatar: video.author?.thumbnails || [],
+          verified: video.author?.is_verified || false,
+          id: video.author?.id || null
         }
-
-        return mapped;
-      }) : [];
-
-    console.log('Filtered videos count:', videos.length);
-    console.log('Untitled videos count:', videos.filter(v => v.title === 'Untitled').length);
+      })) : [];
 
     // Filter out videos from blocked channels
     const filteredVideos = await filterBlockedChannels(videos);
@@ -274,7 +214,7 @@ router.get('/', async (req, res) => {
     } else if (filterOutShorts !== false) { // Default behavior: filter out shorts
       const { videos } = separateVideosAndShorts(filteredVideos);
       const sortedVideos = sortVideos(videos, sortBy);
-      console.log(`🎬 SEARCH FILTERED SHORTS: Showing ${sortedVideos.length} regular videos (${filteredVideos.length - sortedVideos.length} shorts filtered out)`);
+
       res.json({
         videos: sortedVideos,
         searchId: hasMoreResults ? currentSearchId : null
