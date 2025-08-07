@@ -531,6 +531,9 @@ function createSubscriptionVideoCard(video) {
                  <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
                      <i class="fas fa-eye-slash"></i>
                  </button>
+                 <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}');">
+                     <i class="fas fa-link"></i>
+                 </button>
                  <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
                      <i class="fas fa-plus"></i>
                  </button>

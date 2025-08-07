@@ -165,49 +165,257 @@ router.get('/:id/comments', async (req, res) => {
   }
 });
 
-// Get recommended videos
+// Get recommended videos - Using watch_next_feed with search fallback
 router.get('/:id/recommendations', async (req, res) => {
   const youtube = await getYoutubeClient();
   const { id } = req.params;
+
   try {
-    const infoResponse = await youtube.getInfo(id);
+    console.log(`=== FETCHING RECOMMENDATIONS FOR ${id} ===`);
 
-    // console.log('Full getInfo response for recommendations:', JSON.stringify(infoResponse, null, 2)); // Optional: Log the full structure
+    const videoInfo = await youtube.getInfo(id);
+    console.log('Video info keys:', Object.keys(videoInfo));
 
-    // --- Extract recommendations from watch_next_feed ---
-    let resultsNodes = [];
-    if (Array.isArray(infoResponse.watch_next_feed)) {
-      resultsNodes = infoResponse.watch_next_feed;
-    } else {
-      console.warn(`Could not find recommendations array at infoResponse.watch_next_feed for ${id}`);
+    let recommendations = [];
+
+    // APPROACH 1: Try to get recommendations from watch_next_feed (primary method)
+    if (videoInfo.watch_next_feed && Array.isArray(videoInfo.watch_next_feed) && videoInfo.watch_next_feed.length > 0) {
+      console.log(`🎯 PRIMARY METHOD: Using watch_next_feed with ${videoInfo.watch_next_feed.length} items`);
+
+      recommendations = videoInfo.watch_next_feed
+        .filter(item => {
+          // Filter for video-like objects with required properties
+          return item && (item.id || item.video_id) && item.title;
+        })
+        .map(video => {
+          console.log('Processing watch_next video:', video.id || video.video_id, video.title?.text || video.title);
+          return {
+            id: video.id || video.video_id,
+            title: video.title?.text || video.title || 'Untitled',
+            duration: video.duration?.text || video.duration_text?.text || '0:00',
+            viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+            uploadedAt: video.published?.text || video.published_time_text?.text || 'Unknown date',
+            thumbnails: video.thumbnails || [],
+            channel: {
+              name: video.author?.name || video.channel?.name || 'Unknown',
+              avatar: video.author?.thumbnails || video.channel?.thumbnails || [],
+              verified: video.author?.is_verified || video.channel?.is_verified || false,
+              id: video.author?.id || video.channel?.id || null
+            }
+          };
+        })
+        .filter(v => v.id && v.title && v.id !== id); // Ensure valid videos and exclude current video
+
+      console.log(`✅ PRIMARY METHOD SUCCESS: Extracted ${recommendations.length} valid recommendations from watch_next_feed`);
     }
 
-    // Filter these nodes to get only video recommendations (e.g., CompactVideo)
-    const recommendedVideoNodes = resultsNodes.filter(node => node.is(YTNodes.CompactVideo) || node.constructor.name === 'CompactVideoRenderer') || [];
+    // APPROACH 2: If we don't have enough recommendations, use search fallback
+    if (recommendations.length < 5) {
+      console.log(`🔄 FALLBACK METHOD: Only found ${recommendations.length} recommendations from primary method, using search fallback...`);
 
-    const recommendations = recommendedVideoNodes.map(video => {
-      // Adapt mapping based on the actual node type (CompactVideo)
-      return {
-        id: video.id,
-        title: video.title?.text || video.title || 'Untitled',
-        duration: video.duration?.text || '0:00',
-        viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
-        uploadedAt: video.published_time_text?.text || video.published?.text || 'Unknown date',
-        thumbnails: video.thumbnails || [],
-        channel: {
-          name: video.author?.name || 'Unknown',
-          avatar: video.author?.thumbnails || [],
-          verified: video.author?.is_verified || false,
-          id: video.author?.id || null
+      const videoTitle = videoInfo.basic_info?.title || '';
+      const channelName = videoInfo.basic_info?.channel?.name || '';
+
+      console.log(`Video title: "${videoTitle}"`);
+      console.log(`Channel name: "${channelName}"`);
+
+      if (videoTitle) {
+        try {
+          const searchResults = await youtube.search(videoTitle, { type: 'video' });
+          console.log('Search results length:', searchResults.results?.length || 0);
+
+          if (searchResults.results && searchResults.results.length > 0) {
+            const searchVideos = searchResults.results
+              .filter(video => video.id !== id) // Exclude current video
+              .slice(0, 15) // Get top 15 recommendations
+              .map(video => ({
+                id: video.id,
+                title: video.title?.text || video.title || 'Untitled',
+                duration: video.duration?.text || '0:00',
+                viewCount: video.short_view_count?.text || video.view_count?.text || '0 views',
+                uploadedAt: video.published?.text || 'Unknown date',
+                thumbnails: video.thumbnails || [],
+                channel: {
+                  name: video.author?.name || 'Unknown',
+                  avatar: video.author?.thumbnails || [],
+                  verified: video.author?.is_verified || false,
+                  id: video.author?.id || null
+                }
+              }))
+              .filter(v => v.id && v.title);
+
+            // Add search results that aren't already in recommendations
+            searchVideos.forEach(video => {
+              if (!recommendations.find(r => r.id === video.id)) {
+                recommendations.push(video);
+              }
+            });
+
+            console.log(`✅ FALLBACK METHOD SUCCESS: Added ${searchVideos.length} videos from search, total: ${recommendations.length}`);
+          }
+        } catch (searchError) {
+          console.warn('❌ FALLBACK METHOD FAILED:', searchError.message);
         }
-      };
-    }).filter(v => v.id && v.title); // Ensure basic validity
+      }
+    }
 
+    // Add a clear summary of what method was used
+    const methodUsed = recommendations.length > 0 ?
+      (videoInfo.watch_next_feed && videoInfo.watch_next_feed.length > 0 ? "PRIMARY (watch_next_feed)" : "FALLBACK (search)")
+      : "NONE";
+
+    console.log(`🎉 FINAL RESULT: ${recommendations.length} recommendations using ${methodUsed} method`);
     res.json(recommendations);
 
   } catch (error) {
     console.error(`Recommendations error for video ${id}:`, error);
     res.status(500).json({ error: `Failed to retrieve recommendations: ${error.message}` });
+  }
+});
+
+// Debug endpoint for analyzing getInfo response structure
+router.get('/:id/debug', async (req, res) => {
+  const youtube = await getYoutubeClient();
+  const { id } = req.params;
+
+  try {
+    console.log(`\n=== DEBUG ANALYSIS FOR VIDEO ${id} ===`);
+    const infoResponse = await youtube.getInfo(id);
+
+    // Helper function to analyze object structure
+    const analyzeObject = (obj, path = '', maxDepth = 3, currentDepth = 0) => {
+      if (currentDepth >= maxDepth || !obj || typeof obj !== 'object') {
+        return { type: typeof obj, isArray: Array.isArray(obj) };
+      }
+
+      const analysis = {
+        type: typeof obj,
+        isArray: Array.isArray(obj),
+        keys: Array.isArray(obj) ? [] : Object.keys(obj),
+        length: Array.isArray(obj) ? obj.length : undefined,
+        children: {}
+      };
+
+      if (Array.isArray(obj) && obj.length > 0) {
+        analysis.sampleItem = analyzeObject(obj[0], `${path}[0]`, maxDepth, currentDepth + 1);
+      } else if (!Array.isArray(obj)) {
+        for (const key of Object.keys(obj).slice(0, 10)) { // Limit to first 10 keys
+          analysis.children[key] = analyzeObject(obj[key], `${path}.${key}`, maxDepth, currentDepth + 1);
+        }
+      }
+
+      return analysis;
+    };
+
+    const analysis = {
+      topLevel: analyzeObject(infoResponse, 'root', 4),
+      videoDetails: infoResponse.basic_info ? {
+        id: infoResponse.basic_info.id,
+        title: infoResponse.basic_info.title?.text || infoResponse.basic_info.title,
+        channel: infoResponse.basic_info.channel?.name?.text || infoResponse.basic_info.channel?.name
+      } : 'Not found',
+      possibleRecommendationLocations: {}
+    };
+
+    // Check all possible locations for recommendations
+    const locationsToCheck = [
+      'watch_next_feed',
+      'watch_next.results',
+      'watch_next.contents',
+      'results',
+      'secondary_results',
+      'sidebar',
+      'related_videos',
+      'contents.twoColumnWatchNextResults.secondaryResults',
+      'contents.twoColumnWatchNextResults.sidebar',
+      'response.contents.twoColumnWatchNextResults.secondaryResults'
+    ];
+
+    for (const location of locationsToCheck) {
+      const keys = location.split('.');
+      let current = infoResponse;
+      let exists = true;
+
+      for (const key of keys) {
+        if (current && typeof current === 'object' && key in current) {
+          current = current[key];
+        } else {
+          exists = false;
+          break;
+        }
+      }
+
+      if (exists) {
+        analysis.possibleRecommendationLocations[location] = {
+          exists: true,
+          type: typeof current,
+          isArray: Array.isArray(current),
+          length: Array.isArray(current) ? current.length : undefined,
+          structure: analyzeObject(current, location, 2)
+        };
+
+        // If it's an array, analyze the first few items
+        if (Array.isArray(current) && current.length > 0) {
+          analysis.possibleRecommendationLocations[location].sampleItems = current.slice(0, 3).map((item, index) => ({
+            index,
+            analysis: analyzeObject(item, `${location}[${index}]`, 2)
+          }));
+        }
+      } else {
+        analysis.possibleRecommendationLocations[location] = { exists: false };
+      }
+    }
+
+    // Look for any properties that might contain video-like objects
+    const findVideoLikeObjects = (obj, path = '', depth = 0) => {
+      if (depth > 3 || !obj || typeof obj !== 'object') return [];
+
+      let found = [];
+
+      if (Array.isArray(obj)) {
+        obj.forEach((item, index) => {
+          if (item && typeof item === 'object' && (item.id || item.video_id || item.videoId)) {
+            found.push({
+              path: `${path}[${index}]`,
+              hasId: !!(item.id || item.video_id || item.videoId),
+              hasTitle: !!(item.title),
+              hasThumbnails: !!(item.thumbnails),
+              hasAuthor: !!(item.author || item.channel),
+              keys: Object.keys(item)
+            });
+          }
+          found = found.concat(findVideoLikeObjects(item, `${path}[${index}]`, depth + 1));
+        });
+      } else {
+        for (const [key, value] of Object.entries(obj)) {
+          if (value && typeof value === 'object' && (value.id || value.video_id || value.videoId)) {
+            found.push({
+              path: `${path}.${key}`,
+              hasId: !!(value.id || value.video_id || value.videoId),
+              hasTitle: !!(value.title),
+              hasThumbnails: !!(value.thumbnails),
+              hasAuthor: !!(value.author || value.channel),
+              keys: Object.keys(value)
+            });
+          }
+          found = found.concat(findVideoLikeObjects(value, `${path}.${key}`, depth + 1));
+        }
+      }
+
+      return found;
+    };
+
+    analysis.videoLikeObjects = findVideoLikeObjects(infoResponse, 'root');
+
+    console.log('Debug analysis complete');
+    res.json(analysis);
+
+  } catch (error) {
+    console.error(`Debug error for video ${id}:`, error);
+    res.status(500).json({
+      error: `Debug failed: ${error.message}`,
+      stack: error.stack
+    });
   }
 });
 

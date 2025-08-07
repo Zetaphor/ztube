@@ -197,6 +197,9 @@ function createShortCard(short) {
       </div>
       <!-- Thumbnail Hover Icons -->
       <div class="thumbnail-icons absolute top-2 right-2 flex flex-col gap-1 z-10">
+        <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${short.id}');">
+          <i class="fas fa-link"></i>
+        </button>
         <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
           <i class="fas fa-plus"></i>
         </button>

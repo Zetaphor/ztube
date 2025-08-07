@@ -32,3 +32,56 @@ export function formatTime(seconds) {
 
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
+
+export function copyVideoLink(videoId) {
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    // Use the modern clipboard API
+    navigator.clipboard.writeText(videoUrl).then(() => {
+      showCopySuccessMessage();
+    }).catch(err => {
+      console.error('Failed to copy video link:', err);
+      fallbackCopyTextToClipboard(videoUrl);
+    });
+  } else {
+    // Fallback for older browsers or non-HTTPS contexts
+    fallbackCopyTextToClipboard(videoUrl);
+  }
+}
+
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+
+  // Avoid scrolling to bottom
+  textArea.style.top = '0';
+  textArea.style.left = '0';
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      showCopySuccessMessage();
+    } else {
+      console.error('Fallback: Copy command was unsuccessful');
+    }
+  } catch (err) {
+    console.error('Fallback: Oops, unable to copy', err);
+  }
+
+  document.body.removeChild(textArea);
+}
+
+function showCopySuccessMessage() {
+  const message = document.createElement('div');
+  message.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+  message.innerHTML = '<i class="fas fa-check mr-2"></i>YouTube link copied to clipboard!';
+  document.body.appendChild(message);
+  setTimeout(() => message.remove(), 2000);
+}

@@ -163,6 +163,9 @@ function createPlaylistVideoCard(video, index) {
                 <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
                     <i class="fas fa-eye-slash"></i>
                 </button>
+                <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${video.video_id}');">
+                    <i class="fas fa-link"></i>
+                </button>
                 <!-- Add other icons like playlist/bookmark if needed later -->
             </div>
         </div>

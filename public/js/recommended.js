@@ -63,6 +63,9 @@ function createRecommendedVideoCard(video) {
           <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
             <i class="fas fa-eye-slash"></i>
           </button>
+          <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}');">
+            <i class="fas fa-link"></i>
+          </button>
           <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
             <i class="fas fa-plus"></i>
           </button>
@@ -161,20 +164,29 @@ function createRecommendedVideoCard(video) {
  * @param {Array} videos - An array of video objects.
  */
 function displayRecommendedVideos(videos) {
+  console.log(`🎨 [BROWSER] Starting to display ${videos?.length || 0} recommended videos`);
+
   const recommendedContainer = getRecommendedContainer();
-  if (!recommendedContainer) return;
+  if (!recommendedContainer) {
+    console.error("❌ [BROWSER] recommendedContainer not found!");
+    return;
+  }
 
   recommendedContainer.innerHTML = ''; // Clear loading/error message
 
   if (!videos || videos.length === 0) {
+    console.log(`⚠️ [BROWSER] No videos to display`);
     recommendedContainer.innerHTML = '<p class="text-zinc-400 text-sm">No recommendations found.</p>';
     return;
   }
 
-  videos.forEach(video => {
+  videos.forEach((video, index) => {
+    console.log(`🎥 [BROWSER] Creating card ${index + 1}/${videos.length} for video: ${video.id} - ${video.title}`);
     const card = createRecommendedVideoCard(video);
     recommendedContainer.appendChild(card);
   });
+
+  console.log(`✅ [BROWSER] Successfully displayed ${videos.length} recommendation cards`);
 
   // Process the newly added recommended cards for watch history
   if (window.processCardsForWatchHistory) {
@@ -189,6 +201,8 @@ function displayRecommendedVideos(videos) {
  * @param {string} videoId - The ID of the video to get recommendations for.
  */
 export async function fetchRecommendedVideos(videoId) {
+  console.log(`🔎 [BROWSER] Starting to fetch recommendations for video: ${videoId}`);
+
   const recommendedContainer = getRecommendedContainer();
   if (!recommendedContainer) {
     console.error("[Recommended] Recommended videos container element not found!");
@@ -198,6 +212,7 @@ export async function fetchRecommendedVideos(videoId) {
   recommendedContainer.innerHTML = '<p class="text-zinc-400 text-sm">Loading recommendations...</p>';
 
   try {
+    console.log(`🌐 [BROWSER] Making API request to: /api/video/${videoId}/recommendations`);
     const response = await fetch(`/api/video/${videoId}/recommendations`);
 
     if (!response.ok) {
@@ -211,10 +226,12 @@ export async function fetchRecommendedVideos(videoId) {
     }
 
     const recommendations = await response.json();
+    console.log(`✅ [BROWSER] Received ${recommendations.length} recommendations from server`);
+    console.log(`📋 [BROWSER] First few recommendations:`, recommendations.slice(0, 3).map(r => ({ id: r.id, title: r.title })));
     displayRecommendedVideos(recommendations);
 
   } catch (error) {
-    console.error('[Recommended] Error in fetchRecommendedVideos:', error);
+    console.error('❌ [BROWSER] Error in fetchRecommendedVideos:', error);
     recommendedContainer.innerHTML = '<p class="text-red-500 text-sm">Failed to load recommendations.</p>';
     showError('Failed to load recommendations.');
   }

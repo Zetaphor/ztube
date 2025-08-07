@@ -1,4 +1,4 @@
-import { showError, showLoading, hideLoading, formatTime } from './utils.js';
+import { showError, showLoading, hideLoading, formatTime, copyVideoLink } from './utils.js';
 import * as SponsorBlock from './sponsorblock.js';
 import * as Player from './player.js';
 import * as Recommended from './recommended.js';
@@ -292,6 +292,19 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, s
     }
     // -- End Setup Watch Later Button --
 
+    // -- Setup Copy Link Button (Player specific) --
+    const videoPlayerCopyLinkBtn = document.getElementById('videoPlayerCopyLinkBtn');
+    if (videoPlayerCopyLinkBtn) {
+      // Remove previous listener if any, then add new one
+      const newCopyLinkButton = videoPlayerCopyLinkBtn.cloneNode(true);
+      videoPlayerCopyLinkBtn.parentNode.replaceChild(newCopyLinkButton, videoPlayerCopyLinkBtn);
+
+      newCopyLinkButton.addEventListener('click', () => {
+        copyVideoLink(videoId);
+      });
+    }
+    // -- End Setup Copy Link Button --
+
   } catch (error) {
     showError(`Failed to play video: ${error.message}`);
     console.error('Playback error (app.js):', error);
@@ -300,6 +313,9 @@ window.loadAndDisplayVideo = async function (videoId, videoCardElement = null, s
     hideLoading();
   }
 }
+
+// Make copyVideoLink available globally
+window.copyVideoLink = copyVideoLink;
 
 // Event Listeners (App Level)
 if (searchButton) {
@@ -488,6 +504,9 @@ function createVideoCard(video) {
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
                 <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
                     <i class="fas fa-eye-slash"></i>
+                </button>
+                <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}');">
+                    <i class="fas fa-link"></i>
                 </button>
                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
                     <i class="fas fa-plus"></i>
