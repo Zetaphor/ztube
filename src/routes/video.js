@@ -2,6 +2,7 @@ import express from 'express';
 import { YTNodes } from 'youtubei.js';
 import getYoutubeClient from '../utils/youtubeClient.js';
 import { formatViewCount, formatDuration } from '../utils/formatters.js';
+import { filterBlockedChannels } from '../utils/contentFilter.js';
 
 const router = express.Router();
 
@@ -265,7 +266,12 @@ router.get('/:id/recommendations', async (req, res) => {
       : "NONE";
 
     console.log(`🎉 FINAL RESULT: ${recommendations.length} recommendations using ${methodUsed} method`);
-    res.json(recommendations);
+
+    // Filter out videos from blocked channels
+    const filteredRecommendations = await filterBlockedChannels(recommendations);
+    console.log(`🔒 FILTERED: ${recommendations.length - filteredRecommendations.length} recommendations removed from blocked channels`);
+
+    res.json(filteredRecommendations);
 
   } catch (error) {
     console.error(`Recommendations error for video ${id}:`, error);

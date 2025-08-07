@@ -168,6 +168,7 @@ function createShortCard(short) {
   card.dataset.videoTitle = shortTitle;
   card.dataset.channelName = channelNameText;
   card.dataset.thumbnailUrl = thumbnail;
+  card.dataset.channelId = channelId;
 
   // Click handler to play the Short
   card.onclick = () => {
@@ -197,15 +198,25 @@ function createShortCard(short) {
       </div>
       <!-- Thumbnail Hover Icons -->
       <div class="thumbnail-icons absolute top-2 right-2 flex flex-col gap-1 z-10">
-        <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${short.id}');">
-          <i class="fas fa-link"></i>
-        </button>
         <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
           <i class="fas fa-plus"></i>
         </button>
         <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
           <i class="far fa-bookmark"></i>
         </button>
+        <div class="relative">
+          <button class="thumbnail-icon-btn more-options-btn" title="More options" onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden');">
+            <i class="fas fa-ellipsis-v"></i>
+          </button>
+          <div class="absolute right-full top-0 mr-1 bg-zinc-800 rounded-lg shadow-lg border border-zinc-700 hidden min-w-40 z-20 whitespace-nowrap">
+            <button class="copy-link-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-t-lg flex items-center" onclick="event.stopPropagation(); window.copyVideoLink('${short.id}'); this.closest('.absolute').classList.add('hidden');">
+              <i class="fas fa-link mr-2"></i>Copy Link
+            </button>
+            ${channelId ? `<button class="block-channel-btn w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-zinc-700 rounded-b-lg flex items-center" onclick="event.stopPropagation(); window.blockChannelFromVideo('${channelId}', '${channelNameText.replace(/'/g, "\\'")}'); this.closest('.absolute').classList.add('hidden');">
+              <i class="fas fa-ban mr-2"></i>Block Channel
+            </button>` : ''}
+          </div>
+        </div>
       </div>
     </div>
     <div class="p-2">

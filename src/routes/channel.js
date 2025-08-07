@@ -1,5 +1,6 @@
 import express from 'express';
 import getYoutubeClient from '../utils/youtubeClient.js';
+import { filterBlockedChannels } from '../utils/contentFilter.js';
 // import { formatViewCount, formatDuration } from '../utils/formatters.js'; // Might need these if we enhance video data
 
 const router = express.Router();
@@ -152,8 +153,11 @@ router.get('/api/:id/videos', async (req, res) => {
     // The path to the continuation token might vary based on the response structure
     const nextContinuation = channelVideosResponse.continuation || channelVideosResponse.continuation_contents?.continuation || null;
 
+    // Filter out videos from blocked channels (though this might be redundant for channel-specific pages)
+    const filteredVideos = await filterBlockedChannels(videos);
+
     res.json({
-      videos: videos,
+      videos: filteredVideos,
       continuation: nextContinuation
     });
 

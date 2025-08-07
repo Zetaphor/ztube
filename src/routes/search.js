@@ -1,6 +1,7 @@
 import express from 'express';
 import getYoutubeClient from '../utils/youtubeClient.js';
 import { separateVideosAndShorts } from '../utils/shortsDetection.js';
+import { filterBlockedChannels } from '../utils/contentFilter.js';
 
 const router = express.Router();
 
@@ -31,18 +32,21 @@ router.get('/', async (req, res) => {
       }
     })) : [];
 
+    // Filter out videos from blocked channels
+    const filteredVideos = await filterBlockedChannels(videos);
+
     // Check if we should separate videos and Shorts or filter for Shorts only
     const filterShorts = req.query.shorts_only === 'true';
     const separateContent = req.query.separate === 'true';
 
     if (filterShorts) {
-      const { shorts } = separateVideosAndShorts(videos);
+      const { shorts } = separateVideosAndShorts(filteredVideos);
       res.json(shorts);
     } else if (separateContent) {
-      const separated = separateVideosAndShorts(videos);
+      const separated = separateVideosAndShorts(filteredVideos);
       res.json(separated);
     } else {
-      res.json(videos);
+      res.json(filteredVideos);
     }
   } catch (error) {
     console.error('Search API error:', error);

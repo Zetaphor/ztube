@@ -64,8 +64,6 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
     db.run('PRAGMA journal_mode=WAL;', (walErr) => {
       if (walErr) {
         console.error('Error enabling WAL mode:', walErr.message);
-      } else {
-        console.log('WAL mode enabled.');
       }
     });
     // Enforce foreign key constraints
@@ -155,10 +153,8 @@ function initializeSchema() {
         );
 
         -- Default Settings (Example)
-        INSERT OR IGNORE INTO settings (key, value) VALUES
-            ('theme', 'dark'),
-            ('autoplay', 'true'),
-            ('default_quality', 'auto');
+        -- INSERT OR IGNORE INTO settings (key, value) VALUES
+        --     ('setting_name', 'setting_value');
     `;
 
   db.exec(schema, (err) => {

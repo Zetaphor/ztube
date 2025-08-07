@@ -2,6 +2,7 @@ import express from 'express';
 import getYoutubeClient from '../utils/youtubeClient.js';
 import { isShort, separateVideosAndShorts } from '../utils/shortsDetection.js';
 import { formatViewCount, formatDuration } from '../utils/formatters.js';
+import { filterBlockedChannels } from '../utils/contentFilter.js';
 
 const router = express.Router();
 
@@ -188,8 +189,12 @@ router.get('/subscriptions', async (req, res) => {
     const shortsResults = await Promise.all(shortsPromises);
     const shorts = shortsResults.filter(short => short !== null);
 
-    console.info(`Found ${shorts.length} shorts from ${recentVideos.length} recent subscription videos`);
-    res.json(shorts);
+    // Filter out shorts from blocked channels
+    const filteredShorts = await filterBlockedChannels(shorts);
+    console.log(`🔒 FILTERED: ${shorts.length - filteredShorts.length} shorts removed from blocked channels`);
+
+    console.info(`Found ${filteredShorts.length} shorts from ${recentVideos.length} recent subscription videos`);
+    res.json(filteredShorts);
 
   } catch (error) {
     console.error('Shorts subscriptions error:', error);
@@ -227,7 +232,10 @@ router.get('/search', async (req, res) => {
 
     const { shorts } = separateVideosAndShorts(allVideos);
 
-    res.json(shorts);
+    // Filter out shorts from blocked channels
+    const filteredShorts = await filterBlockedChannels(shorts);
+
+    res.json(filteredShorts);
   } catch (error) {
     console.error('Shorts search error:', error);
     res.status(500).json({ error: `Shorts search failed: ${error.message}` });

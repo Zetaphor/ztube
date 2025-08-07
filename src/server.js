@@ -68,6 +68,11 @@ app.get('/import', (req, res) => {
   res.render('import');
 });
 
+// Route for Settings page
+app.get('/settings', (req, res) => {
+  res.render('settings');
+});
+
 // Mount Routers
 app.use('/api/search', searchRouter);
 app.use('/api/video', videoRouter);

@@ -1,4 +1,4 @@
-import { showError, showLoading, hideLoading, formatTime, copyVideoLink } from './utils.js';
+import { showError, showLoading, hideLoading, formatTime, copyVideoLink, blockChannel } from './utils.js';
 import * as SponsorBlock from './sponsorblock.js';
 import * as Player from './player.js';
 import * as Recommended from './recommended.js';
@@ -458,6 +458,7 @@ function createVideoCard(video) {
   card.dataset.videoTitle = videoTitle;
   card.dataset.channelName = channelNameText;
   card.dataset.thumbnailUrl = thumbnail;
+  card.dataset.channelId = channelId;
 
   const isLivestream = duration === "N/A" && typeof views === 'string' && views.includes("watching");
 
@@ -502,18 +503,28 @@ function createVideoCard(video) {
             </div>
             <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
-                <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
-                    <i class="fas fa-eye-slash"></i>
-                </button>
-                <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}');">
-                    <i class="fas fa-link"></i>
-                </button>
                 <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
                     <i class="fas fa-plus"></i>
                 </button>
                 <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
                     <i class="far fa-bookmark"></i> <!-- Default empty state -->
                 </button>
+                <div class="relative">
+                    <button class="thumbnail-icon-btn more-options-btn" title="More options" onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden');">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="absolute right-0 top-full mt-1 bg-zinc-800 rounded-lg shadow-lg border border-zinc-700 hidden min-w-40 z-20 whitespace-nowrap">
+                        <button class="copy-link-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-t-lg flex items-center" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}'); this.closest('.absolute').classList.add('hidden');">
+                            <i class="fas fa-link mr-2"></i>Copy Link
+                        </button>
+                        <button class="remove-history-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 hidden flex items-center" onclick="event.stopPropagation(); this.closest('.absolute').classList.add('hidden');" title="Remove from History">
+                            <i class="fas fa-eye-slash mr-2"></i>Remove from History
+                        </button>
+                        <button class="block-channel-btn w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-zinc-700 rounded-b-lg flex items-center" onclick="event.stopPropagation(); window.blockChannelFromVideo('${channelId}', '${channelNameText.replace(/'/g, "\\'")}'); this.closest('.absolute').classList.add('hidden');">
+                            <i class="fas fa-ban mr-2"></i>Block Channel
+                        </button>
+                    </div>
+                </div>
             </div>
             <!-- End Thumbnail Hover Icons -->
         </div>
@@ -1070,6 +1081,24 @@ function clearWatchHistoryCacheForIds(videoIds) {
 // Expose for use by other modules (like subscriptions-page.js)
 window.processCardsForWatchHistory = processCardsForWatchHistory;
 window.clearWatchHistoryCacheForIds = clearWatchHistoryCacheForIds; // Expose the new function
+
+// Make block channel function available globally for video cards
+window.blockChannelFromVideo = async function (channelId, channelName) {
+  await blockChannel(channelId, channelName);
+};
+
+// Handle closing dropdowns when clicking outside
+document.addEventListener('click', function (event) {
+  // Close all open dropdown menus
+  const openDropdowns = document.querySelectorAll('.thumbnail-icons .absolute:not(.hidden)');
+  openDropdowns.forEach(dropdown => {
+    // Check if the click was outside the dropdown and its trigger button
+    const container = dropdown.closest('.relative');
+    if (container && !container.contains(event.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+});
 
 // === DEFINE GLOBAL FUNCTION EARLY ===
 // Make videoCardElement optional and default to null

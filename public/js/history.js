@@ -128,6 +128,11 @@ function displayHistory(historyEntries, reset = false) {
                 title="Resume watching">
           <i class="fas fa-play"></i>
         </button>
+        ${entry.channel_id ? `<button class="text-zinc-400 hover:text-red-500 text-sm"
+                onclick="blockChannelFromHistory('${entry.channel_id}', '${escapeHtml(entry.channel_name || 'Unknown Channel')}')"
+                title="Block channel">
+          <i class="fas fa-ban"></i>
+        </button>` : ''}
         <button class="text-zinc-400 hover:text-red-500 text-sm"
                 onclick="removeHistoryEntry('${entry.id}')"
                 title="Remove from history">
@@ -264,6 +269,37 @@ function escapeHtml(unsafe) {
 window.playVideo = playVideo;
 window.resumeVideo = resumeVideo;
 window.removeHistoryEntry = removeHistoryEntry;
+
+// Function to block a channel from history
+async function blockChannelFromHistory(channelId, channelName) {
+  try {
+    const response = await fetch('/api/hidden/channels', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        channelId: channelId,
+        name: channelName
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    showSuccessMessage(`"${channelName}" has been blocked`);
+
+    // Reload history to remove blocked channel's videos
+    loadHistory(true);
+
+  } catch (error) {
+    console.error('Error blocking channel:', error);
+    showErrorMessage(`Failed to block "${channelName}"`);
+  }
+}
+
+window.blockChannelFromHistory = blockChannelFromHistory;
 
 
 

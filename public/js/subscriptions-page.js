@@ -57,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateAllSubscriptionBookmarkIcons = () => {
     // Target only cards within the subscription videos container
     const cards = videosContent?.querySelectorAll('.video-card') || [];
-    console.log(`[Subscriptions] Found ${cards.length} cards to update bookmark status.`);
     cards.forEach(card => {
       if (card.dataset.videoId) {
         updateBookmarkIconState(card);
@@ -68,18 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Listen for the event dispatched when default playlist info is loaded
   document.addEventListener('defaultPlaylistLoaded', () => {
-    console.log("[Subscriptions] Received defaultPlaylistLoaded event. Updating icons.");
     updateAllSubscriptionBookmarkIcons();
   });
 
   // Listen for a custom event that signals UI might need an update
   document.addEventListener('uiNeedsBookmarkUpdate', () => {
-    console.log("[Subscriptions] Received uiNeedsBookmarkUpdate event. Updating icons.");
     // Check if data is ready before updating
     if (window.defaultPlaylistInfoLoaded) {
       updateAllSubscriptionBookmarkIcons();
-    } else {
-      console.log("[Subscriptions] Default playlist info not yet loaded, skipping immediate update.");
     }
   });
   // --- End Event Listener Setup ---
@@ -528,18 +523,28 @@ function createSubscriptionVideoCard(video) {
             </div>
              <!-- Thumbnail Hover Icons -->
             <div class="thumbnail-icons absolute top-1 right-1 flex flex-row gap-1.5 z-10">
-                 <button class="remove-history-btn thumbnail-icon-btn hidden hover:bg-red-600" title="Remove from History">
-                     <i class="fas fa-eye-slash"></i>
-                 </button>
-                 <button class="copy-link-btn thumbnail-icon-btn" title="Copy Video Link" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}');">
-                     <i class="fas fa-link"></i>
-                 </button>
                  <button class="add-to-playlist-hover-btn thumbnail-icon-btn" title="Add to Playlist">
                      <i class="fas fa-plus"></i>
                  </button>
                  <button class="bookmark-btn thumbnail-icon-btn" title="Add to Watch Later">
                      <i class="far fa-bookmark"></i> <!-- Default empty state -->
                  </button>
+                 <div class="relative">
+                     <button class="thumbnail-icon-btn more-options-btn" title="More options" onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden');">
+                         <i class="fas fa-ellipsis-v"></i>
+                     </button>
+                     <div class="absolute right-0 top-full mt-1 bg-zinc-800 rounded-lg shadow-lg border border-zinc-700 hidden min-w-40 z-20 whitespace-nowrap">
+                         <button class="copy-link-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-t-lg flex items-center" onclick="event.stopPropagation(); window.copyVideoLink('${video.id}'); this.closest('.absolute').classList.add('hidden');">
+                             <i class="fas fa-link mr-2"></i>Copy Link
+                         </button>
+                         <button class="remove-history-btn w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 hidden flex items-center" onclick="event.stopPropagation(); this.closest('.absolute').classList.add('hidden');" title="Remove from History">
+                             <i class="fas fa-eye-slash mr-2"></i>Remove from History
+                         </button>
+                         <button class="block-channel-btn w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-zinc-700 rounded-b-lg flex items-center" onclick="event.stopPropagation(); window.blockChannelFromVideo('${video.channelId}', '${(video.channelName || 'Unknown Channel').replace(/'/g, "\\'")}'); this.closest('.absolute').classList.add('hidden');">
+                             <i class="fas fa-ban mr-2"></i>Block Channel
+                         </button>
+                     </div>
+                 </div>
             </div>
             <!-- End Thumbnail Hover Icons -->
         </div>
@@ -574,6 +579,7 @@ function createSubscriptionVideoCard(video) {
   card.dataset.videoTitle = video.title || 'Untitled';
   card.dataset.channelName = video.channelName || 'Unknown Channel';
   card.dataset.thumbnailUrl = video.thumbnailUrl || '/img/default-video.png';
+  card.dataset.channelId = video.channelId;
 
   if (bookmarkBtn && bookmarkIcon && window.toggleVideoInDefaultPlaylist) {
     // Set initial icon state and visibility

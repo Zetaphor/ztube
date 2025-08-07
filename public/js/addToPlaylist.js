@@ -170,13 +170,11 @@ async function toggleVideoInDefaultPlaylist(videoData) {
         throw new Error(errorData.error || `Failed to remove video: ${removeResponse.status}`);
       }
       defaultPlaylistVideoIds.delete(videoId);
-      console.log(`Video ${videoId} removed from default playlist ${defaultPlaylistId}`);
       return false; // Video is now NOT in the playlist
     } else {
       // --- Add Video ---
       await addVideoToApi(defaultPlaylistId, videoData); // Use existing helper
       defaultPlaylistVideoIds.add(videoId);
-      console.log(`Video ${videoId} added to default playlist ${defaultPlaylistId}`);
       return true; // Video is now IN the playlist
     }
   } catch (error) {

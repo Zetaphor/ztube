@@ -85,3 +85,70 @@ function showCopySuccessMessage() {
   document.body.appendChild(message);
   setTimeout(() => message.remove(), 2000);
 }
+
+// Block channel functionality
+export async function blockChannel(channelId, channelName) {
+  if (!channelId || !channelName) {
+    console.error('Missing channelId or channelName for blocking');
+    return;
+  }
+
+  const confirmMsg = `Are you sure you want to block "${channelName}"?\n\nBlocked channels will not appear in your feeds, search results, or recommendations.`;
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/hidden/channels', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        channelId: channelId,
+        name: channelName
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    showBlockSuccessMessage(channelName);
+
+    // Remove all video cards from this channel from the current page
+    removeChannelVideosFromPage(channelId);
+
+  } catch (error) {
+    console.error('Error blocking channel:', error);
+    showError(`Failed to block "${channelName}"`);
+  }
+}
+
+// Remove all videos from a specific channel from the current page
+function removeChannelVideosFromPage(channelId) {
+  const videoCards = document.querySelectorAll('.video-card');
+  videoCards.forEach(card => {
+    // Check if this card belongs to the blocked channel
+    const cardChannelId = card.dataset.channelId;
+    if (cardChannelId === channelId) {
+      // Add fade out animation
+      card.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.95)';
+
+      // Remove after animation
+      setTimeout(() => {
+        card.remove();
+      }, 300);
+    }
+  });
+}
+
+function showBlockSuccessMessage(channelName) {
+  const message = document.createElement('div');
+  message.className = 'fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+  message.innerHTML = `<i class="fas fa-ban mr-2"></i>"${channelName}" has been blocked`;
+  document.body.appendChild(message);
+  setTimeout(() => message.remove(), 3000);
+}

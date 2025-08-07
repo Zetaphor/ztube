@@ -8,6 +8,7 @@ import * as SubscriptionsRepo from '../db/subscriptionsRepository.js';
 import getYoutubeClient from '../utils/youtubeClient.js';
 import { formatViewCount, formatRelativeDate } from '../utils/formatters.js';
 import { separateVideosAndShorts } from '../utils/shortsDetection.js';
+import { filterBlockedChannels } from '../utils/contentFilter.js';
 
 const router = express.Router();
 
@@ -293,13 +294,17 @@ router.get('/feed', async (req, res) => {
     allVideos.sort((a, b) => new Date(b.published) - new Date(a.published));
     console.info(`Feed aggregation complete. Found ${allVideos.length} videos.`);
 
+    // Filter out videos from blocked channels
+    const filteredVideos = await filterBlockedChannels(allVideos);
+    console.log(`🔒 FILTERED: ${allVideos.length - filteredVideos.length} videos removed from blocked channels in subscription feed`);
+
     // Check if we should separate videos and Shorts
     const separateContent = req.query.separate === 'true';
     if (separateContent) {
-      const separated = separateVideosAndShorts(allVideos);
+      const separated = separateVideosAndShorts(filteredVideos);
       res.json(separated);
     } else {
-      res.json(allVideos);
+      res.json(filteredVideos);
     }
 
   } catch (error) {
