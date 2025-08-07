@@ -1,38 +1,62 @@
 # ZTube
 
-A full-featured YouTube client built with privacy in mind.
+Privacy‑first YouTube client with a clean UI, local storage, and optional desktop app. ZTube uses `youtubei.js`, an Express backend, and an EJS frontend. Data lives locally in SQLite.
 
-## LibRedirect Integration
+![screenshot.png](screenshot.png)
 
-ZTube supports integration with the LibRedirect browser extension, allowing you to automatically open YouTube links in ZTube instead of your browser. See [LIBREDIRECT_SETUP.md](LIBREDIRECT_SETUP.md) for detailed setup instructions.
+### Highlights
+- **Subscriptions feed**: Aggregated via channel RSS with thumbnails and view counts; hide Shorts by default or separate them.
+- **Search**: Relevance and sorting (newest, oldest, views, duration) with Shorts filtering.
+- **Video pages**: Details, chapters (when available), comments, and recommendations.
+- **Playlists**: Create, edit, delete, default “Watch Later”, add/remove/reorder videos.
+- **Watch history**: Progress tracking, resume, sort, remove entries, or clear all.
+- **Shorts**: Dedicated pages for trending and subscription Shorts.
+- **Content filters**: Hide channels and keywords globally.
+- **Local-first**: SQLite at `~/.config/ztube/ztube.db` (auto‑migrates from project root if present).
+- **LibRedirect**: Open `freetube://` links directly in ZTube. See `LIBREDIRECT_SETUP.md`.
 
-## FreeTube Data Import
-
-### Import subscriptions (FreeTube CSV export)
-
+### Use ZTube
+1) Install dependencies (first run)
 ```bash
-curl -X POST -F "subscriptionsCsv=@/path/to/youtube-subscriptions.csv" http://localhost:4420/api/subscriptions/import
+npm install
 ```
 
-### Import watch history (FreeTube NDJSON export)
-
+2) Start ZTube
 ```bash
-curl -X POST -F "historyFile=@/path/to/freetube-history.db" http://localhost:4420/api/watch-history/import
+# Web: start the server, then open http://localhost:4420
+npm start
+
+# Or Desktop (Electron) in development
+npm run electron:dev
 ```
 
-### Import playlists (FreeTube NDJSON export)
+- **Env**: `PORT` (default `4420`).
+- **Data**: SQLite file at `~/.config/ztube/ztube.db`.
 
+- **Import your data**: Use the in‑app Import option to bring in FreeTube subscriptions, watch history, and playlists. No CLI required.
+
+### LibRedirect
+Automatically open YouTube links in ZTube using the `freetube://` scheme. See `LIBREDIRECT_SETUP.md` for setup instructions.
+
+### Build
+Package the desktop app (Electron):
 ```bash
-curl -X POST -F "playlistsFile=@/path/to/freetube-playlists.db" http://localhost:4420/api/playlists/import
+npm run build:linux
+npm run build:mac
+npm run build:win
 ```
 
-## Watch History
+### Develop locally
+- Web server with autoreload:
+```bash
+npm run dev
+```
 
-Access your complete watch history with sorting and filtering options at `/history`:
+- Desktop app in development mode:
+```bash
+npm run electron:dev
+```
 
-- **Resume watching** from where you left off
-- **Sort by**: Most recent, oldest, title, or channel
-- **Remove individual videos** from history
-- **Clear all history** at once
-- **Progress indicators** showing how much you've watched
-- **Thumbnail previews** and video metadata
+- Configuration:
+  - `PORT` env var (default `4420`)
+  - Data stored at `~/.config/ztube/ztube.db`
