@@ -435,18 +435,16 @@ function toggleTheaterMode() {
     // --- Activate Theater Mode ---
     // Hide recommendations
     recommendedVideos.classList.add('hidden');
-    // Make main content wider (CSS will handle this via the parent class)
-    mainPlayerContent.classList.remove('md:w-2/3'); // Remove the fractional width constraint
-    mainPlayerContent.classList.add('md:w-full'); // Make it full width on medium+ screens
+    // Make main content take full width (CSS will handle this via flex)
+    mainPlayerContent.classList.add('md:w-full');
     theaterModeBtn.innerHTML = '<i class="fas fa-compress-alt"></i>'; // Icon for exiting
 
   } else {
     // --- Deactivate Theater Mode ---
     // Show recommendations
     recommendedVideos.classList.remove('hidden');
-    // Restore main content width
+    // Restore main content width class override if it was set
     mainPlayerContent.classList.remove('md:w-full');
-    mainPlayerContent.classList.add('md:w-2/3'); // Restore default width
     theaterModeBtn.innerHTML = '<i class="fas fa-film"></i>'; // Icon for entering
   }
 }

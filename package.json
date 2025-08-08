@@ -1,6 +1,6 @@
 {
   "name": "ztube",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "A full-featured YouTube client",
   "author": {
     "name": "Zetaphor",
@@ -70,7 +70,7 @@
         "Name": "ZTube",
         "GenericName": "YouTube Player",
         "Comment": "A full-featured YouTube client built with privacy in mind",
-        "MimeType": "x-scheme-handler/freetube;",
+        "MimeType": "x-scheme-handler/freetube;x-scheme-handler/ztube;",
         "Categories": "Network;AudioVideo;",
         "StartupWMClass": "ZTube"
       }

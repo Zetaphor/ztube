@@ -460,6 +460,19 @@ body {
   right: 10px;
 }
 
+/* Maintain 16:9 aspect ratio in standard (non-theater) mode */
+#videoPlayer:not(.theater-mode-active) #player {
+  aspect-ratio: 16/9;
+  width: 100%;
+  /* Let the player be taller by default relative to its container by allowing growth */
+  flex: 1 1 auto;
+}
+
+/* Make the overall video area taller by default */
+#videoAreaContainer {
+  min-height: 60vh;
+}
+
 #videoPlayer #videoTitle,
 #videoPlayer #videoDescription {
   user-select: text;
