@@ -47,7 +47,7 @@ Exec=/home/$(whoami)/Applications/ZTube.AppImage %U
 Terminal=false
 Type=Application
 Icon=ztube
-MimeType=x-scheme-handler/freetube;
+MimeType=x-scheme-handler/freetube;x-scheme-handler/ztube;
 Categories=Network;AudioVideo;
 StartupWMClass=ZTube
 EOF
@@ -73,7 +73,7 @@ Install the LibRedirect extension in your browser:
 ## How It Works
 
 1. When you click a YouTube link in your browser (while LibRedirect is active), the extension intercepts the link
-2. LibRedirect converts the link to use the `freetube://` protocol
+2. LibRedirect converts the link to use the `freetube://` protocol (ZTube also supports `ztube://`)
 3. Your system opens this protocol with ZTube (since both FreeTube and ZTube register for the same MIME type)
 4. ZTube extracts the video ID from the URL and loads the video
 
@@ -94,6 +94,7 @@ ZTube can handle these YouTube URL formats:
 1. Make sure the AppImage is properly registered:
    ```bash
    xdg-mime query default x-scheme-handler/freetube
+   xdg-mime query default x-scheme-handler/ztube
    ```
    This should show `ztube.desktop` or similar.
 
@@ -105,6 +106,7 @@ ZTube can handle these YouTube URL formats:
 3. Re-register the MIME handler:
    ```bash
    xdg-mime default ztube.desktop x-scheme-handler/freetube
+   xdg-mime default ztube.desktop x-scheme-handler/ztube
    ```
 
 ### ZTube doesn't open when clicking links
@@ -135,7 +137,7 @@ xdg-mime default freetube.desktop x-scheme-handler/freetube
 
 ## Technical Details
 
-- ZTube registers for the MIME type `x-scheme-handler/freetube`
+- ZTube registers for the MIME types `x-scheme-handler/freetube` and `x-scheme-handler/ztube`
 - This is the same MIME type used by FreeTube for LibRedirect compatibility
 - URL arguments are passed via Electron's command line arguments
 - The application uses single-instance mode to focus existing windows when new URLs are opened

@@ -13,10 +13,10 @@ const isDev = process.env.ELECTRON_DEV === 'true';
 
 // Helper function to extract YouTube Video ID
 function extractVideoId(url) {
-  // Handle freetube:// protocol URLs from LibRedirect
-  if (url.startsWith('freetube://')) {
-    // Remove the freetube:// prefix to get the actual content
-    const actualUrl = url.replace('freetube://', '');
+  // Handle freetube:// or ztube:// protocol URLs from LibRedirect or custom handler
+  if (url.startsWith('freetube://') || url.startsWith('ztube://')) {
+    // Remove the scheme prefix to get the actual content
+    const actualUrl = url.replace(/^(\w+):\/\//, '');
 
     // Check if it's a direct video ID (11 characters alphanumeric)
     const videoIdMatch = actualUrl.match(/^([a-zA-Z0-9_-]{11})$/);
@@ -210,8 +210,10 @@ if (!gotTheLock) {
       mainWindow.focus();
     }
 
-    // Handle URL from command line arguments (http or freetube protocol)
-    const url = commandLine.find(arg => arg.startsWith('http') || arg.startsWith('freetube://'));
+    // Handle URL from command line arguments (http, freetube, or ztube protocol)
+    const url = commandLine.find(arg =>
+      arg.startsWith('http') || arg.startsWith('freetube://') || arg.startsWith('ztube://')
+    );
     if (url) {
       handleUrl(url);
     }
@@ -225,8 +227,10 @@ if (!gotTheLock) {
 
   // Initialize app
   app.whenReady().then(() => {
-    // Handle URL from command line arguments on first launch (http or freetube protocol)
-    const url = process.argv.find(arg => arg.startsWith('http') || arg.startsWith('freetube://'));
+    // Handle URL from command line arguments on first launch (http, freetube, or ztube protocol)
+    const url = process.argv.find(arg =>
+      arg.startsWith('http') || arg.startsWith('freetube://') || arg.startsWith('ztube://')
+    );
     if (url) {
       pendingUrl = url;
     }

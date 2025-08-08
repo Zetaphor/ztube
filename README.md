@@ -13,7 +13,7 @@ Privacy‑first YouTube client with a clean UI, local storage, and optional desk
 - **Shorts**: Dedicated pages for trending and subscription Shorts.
 - **Content filters**: Hide channels and keywords globally.
 - **Local-first**: SQLite at `~/.config/ztube/ztube.db` (auto‑migrates from project root if present).
-- **LibRedirect**: Open `freetube://` links directly in ZTube. See `LIBREDIRECT_SETUP.md`.
+- **LibRedirect**: Open `freetube://` or `ztube://` links directly in ZTube. See `LIBREDIRECT_SETUP.md`.
 
 ### Download
 
@@ -42,7 +42,7 @@ npm run electron:dev
 - **Import your data**: Use the in‑app Import option to bring in FreeTube subscriptions, watch history, and playlists. No CLI required.
 
 ### LibRedirect
-Automatically open YouTube links in ZTube using the `freetube://` scheme. See `LIBREDIRECT_SETUP.md` for setup instructions.
+Automatically open YouTube links in ZTube using the `freetube://` or `ztube://` scheme. See `LIBREDIRECT_SETUP.md` for setup instructions.
 
 ### Build
 Package the desktop app (Electron):

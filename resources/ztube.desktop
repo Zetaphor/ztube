@@ -6,6 +6,6 @@ Exec=ztube %U
 Terminal=false
 Type=Application
 Icon=ztube
-MimeType=x-scheme-handler/freetube;
+MimeType=x-scheme-handler/freetube;x-scheme-handler/ztube;
 Categories=Network;AudioVideo;
 StartupWMClass=ZTube
